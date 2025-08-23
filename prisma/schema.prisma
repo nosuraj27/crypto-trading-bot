@@ -1,0 +1,55 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model UserSetting {
+  id        Int      @id @default(autoincrement())
+  userId    String
+  key       String
+  value     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, key])
+}
+
+model TradeHistory {
+  id                    Int       @id @default(autoincrement())
+  tradeId               String    @unique
+  userId                String    @default("default")
+  symbol                String
+  buyExchange           String
+  sellExchange          String
+  buyPrice              Float
+  sellPrice             Float
+  quantity              Float
+  capitalAmount         Float
+  expectedProfit        Float
+  expectedProfitPercent Float
+  actualProfit          Float?
+  actualProfitPercent   Float?
+  status                String // pending, executing, completed, failed, cancelled
+  buyOrderId            String?
+  sellOrderId           String?
+  buySlippage           Float?
+  sellSlippage          Float?
+  totalSlippage         Float?
+  fees                  Float?
+  executionTime         Int? // milliseconds
+  errorMessage          String?
+  buyOrderResponse      String? // JSON string of buy exchange response
+  sellOrderResponse     String? // JSON string of sell exchange response
+  simulation            Boolean   @default(true)
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  completedAt           DateTime?
+
+  @@index([userId, createdAt])
+  @@index([status])
+  @@index([symbol])
+}

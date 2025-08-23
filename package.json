@@ -1,0 +1,22 @@
+{
+    "name": "simple-arbitrage",
+    "version": "1.0.0",
+    "description": "Simple Direct Arbitrage Bot",
+    "main": "app.js",
+    "scripts": {
+        "start": "nodemon app.js",
+        "dev": "nodemon app.js"
+    },
+    "dependencies": {
+        "@prisma/client": "^6.14.0",
+        "axios": "^1.5.0",
+        "dotenv": "^17.2.1",
+        "express": "^4.18.2",
+        "node-cron": "^3.0.2",
+        "socket.io": "^4.7.2",
+        "ws": "^8.18.3"
+    },
+    "devDependencies": {
+        "prisma": "^6.14.0"
+    }
+}
