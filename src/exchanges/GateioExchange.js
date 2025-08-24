@@ -19,7 +19,8 @@ class GateioExchange extends BaseExchange {
 
         // Use testnet URL if in testnet mode
         this.baseUrl = this.testnet ? 'https://api-testnet.gateapi.io/api/v4' : 'https://api.gateio.ws/api/v4';
-        this.wsUrl = this.testnet ? 'wss://api-testnet.gateapi.io/ws/v4/' : 'wss://api.gateio.ws/ws/v4/';
+        // Use the latest Gate.io testnet WebSocket endpoint
+        this.wsUrl = this.testnet ? 'wss://fx-ws-testnet.gateio.ws/v4/ws' : 'wss://api.gateio.ws/ws/v4/';
 
         // Initialize GateioService for authenticated requests
         this.gateioService = new GateioService(this.testnet);
@@ -365,6 +366,17 @@ class GateioExchange extends BaseExchange {
 
         if (type.toLowerCase() === 'limit' && price) {
             params.price = price.toString();
+            params.time_in_force = 'gtc'; // Only for limit orders
+        }
+
+        // For market orders, ensure price and time_in_force are NEVER sent, even if provided
+        if (type.toLowerCase() === 'market') {
+            if ('price' in params) {
+                delete params.price;
+            }
+            if ('time_in_force' in params) {
+                delete params.time_in_force;
+            }
         }
 
         try {
