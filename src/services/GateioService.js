@@ -23,12 +23,6 @@ class GateioService {
 
         // Add request interceptor to log requests
         this.axiosInstance.interceptors.request.use(request => {
-            console.log('🔄 Request:', {
-                method: request.method,
-                url: request.url,
-                data: request.data,
-                headers: request.headers
-            });
             return request;
         });
 
