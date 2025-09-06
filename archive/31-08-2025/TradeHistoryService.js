@@ -14,6 +14,29 @@ class TradeHistoryService {
      */
     static async saveTradeRecord(tradeData) {
         try {
+            // Convert numeric string values to floats
+            const numericFields = {
+                buyPrice: tradeData.buyPrice,
+                sellPrice: tradeData.sellPrice,
+                quantity: tradeData.quantity,
+                capitalAmount: tradeData.capitalAmount,
+                expectedProfit: tradeData.expectedProfit,
+                expectedProfitPercent: tradeData.expectedProfitPercent,
+                actualProfit: tradeData.actualProfit,
+                actualProfitPercent: tradeData.actualProfitPercent,
+                buySlippage: tradeData.buySlippage,
+                sellSlippage: tradeData.sellSlippage,
+                totalSlippage: tradeData.totalSlippage,
+                fees: tradeData.fees
+            };
+
+            // Convert all numeric fields to float
+            const processedNumericFields = Object.entries(numericFields).reduce((acc, [key, value]) => {
+                // Convert string numbers to float, handle null/undefined
+                acc[key] = value !== null && value !== undefined ? parseFloat(value) : null;
+                return acc;
+            }, {});
+
             const trade = await prisma.tradeHistory.create({
                 data: {
                     tradeId: tradeData.tradeId,
@@ -21,27 +44,15 @@ class TradeHistoryService {
                     symbol: tradeData.symbol,
                     buyExchange: tradeData.buyExchange,
                     sellExchange: tradeData.sellExchange,
-                    buyPrice: tradeData.buyPrice,
-                    sellPrice: tradeData.sellPrice,
-                    quantity: tradeData.quantity,
-                    capitalAmount: tradeData.capitalAmount,
-                    expectedProfit: tradeData.expectedProfit,
-                    expectedProfitPercent: tradeData.expectedProfitPercent,
-                    actualProfit: tradeData.actualProfit || null,
-                    actualProfitPercent: tradeData.actualProfitPercent || null,
+                    ...processedNumericFields,
                     status: tradeData.status,
                     buyOrderId: tradeData.buyOrderId || null,
                     sellOrderId: tradeData.sellOrderId || null,
-                    buySlippage: tradeData.buySlippage || null,
-                    sellSlippage: tradeData.sellSlippage || null,
-                    totalSlippage: tradeData.totalSlippage || null,
-                    fees: tradeData.fees || null,
                     executionTime: tradeData.executionTime || null,
                     errorMessage: tradeData.errorMessage || null,
                     buyOrderResponse: tradeData.buyOrderResponse || null,
                     sellOrderResponse: tradeData.sellOrderResponse || null,
-                    tradingMode: tradeData.tradingMode || 'testnet',
-                    arbitrageType: tradeData.arbitrageType || 'Direct',
+                    simulation: tradeData.simulation || true,
                     completedAt: tradeData.status === 'completed' ? new Date() : null
                 }
             });
@@ -62,10 +73,26 @@ class TradeHistoryService {
      */
     static async updateTradeRecord(tradeId, updateData) {
         try {
+            // Define numeric fields that need conversion
+            const numericFields = [
+                'buyPrice', 'sellPrice', 'quantity', 'capitalAmount',
+                'expectedProfit', 'expectedProfitPercent', 'actualProfit',
+                'actualProfitPercent', 'buySlippage', 'sellSlippage',
+                'totalSlippage', 'fees'
+            ];
+
+            // Process updateData to convert numeric strings to floats
+            const processedData = { ...updateData };
+            for (const field of numericFields) {
+                if (field in updateData && updateData[field] !== null) {
+                    processedData[field] = parseFloat(updateData[field]);
+                }
+            }
+
             const trade = await prisma.tradeHistory.update({
                 where: { tradeId },
                 data: {
-                    ...updateData,
+                    ...processedData,
                     updatedAt: new Date(),
                     completedAt: updateData.status === 'completed' ? new Date() : undefined
                 }

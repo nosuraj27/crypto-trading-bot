@@ -1,17 +1,31 @@
 /**
- * Ultra Simple Trade Execution Service
- * Only 2 main functions for easy understanding
+ * Enhanced Trade Execution Service
+ * Supports both Direct and Triangular Arbitrage
  */
 
 const TradeHistoryService = require('./TradeHistoryService');
+const TriangularArbitrageService = require('./TriangularArbitrageService');
+
+// Initialize triangular arbitrage service
+const triangularService = new TriangularArbitrageService(null);
 
 // Simple global variables
 let exchangeManager = null;
 let logger = console;
-let stats = { totalTrades: 0, successfulTrades: 0, totalProfit: 0 };
+let stats = {
+    totalTrades: 0,
+    successfulTrades: 0,
+    totalProfit: 0,
+    directTrades: 0,
+    triangularTrades: 0,
+    directProfit: 0,
+    triangularProfit: 0
+};
 let config = {
     minProfitThreshold: 0.001,
-    tradingMode: 'testnet' // 'testnet' or 'live'
+    tradingMode: 'testnet', // 'testnet' or 'live'
+    enableTriangularArbitrage: true,
+    maxTriangularTradeAmount: 500
 };
 
 const TRADE_STATUS = {
@@ -24,14 +38,44 @@ function setup(exchangeMgr, loggerInstance, settings = {}) {
     exchangeManager = exchangeMgr;
     logger = loggerInstance || console;
     config = { ...config, ...settings };
+
+    // Pass the exchange manager to the triangular arbitrage service
+    triangularService.setExchangeManager(exchangeManager);
+
     logger.log('Trade service setup complete');
 }
 
-// Main function - execute a trade
+// Main function - execute a trade (supports both direct and triangular arbitrage)
 async function executeTrade(opportunity, options = {}) {
     const tradeId = 'trade_' + Date.now();
     const startTime = Date.now();
 
+    try {
+        // Determine arbitrage type
+        const isTriangular = opportunity.arbitrageType === 'Triangular' ||
+            opportunity.type === 'triangular' ||
+            opportunity.tradingPath?.includes('→');
+
+        if (isTriangular && config.enableTriangularArbitrage) {
+            return await executeTriangularArbitrage(opportunity, options, tradeId, startTime);
+        } else {
+            return await executeDirectArbitrage(opportunity, options, tradeId, startTime);
+        }
+
+    } catch (error) {
+        logger.error(`❌ Trade execution failed: ${error.message}`);
+        return {
+            tradeId,
+            status: TRADE_STATUS.FAILED,
+            error: error.message,
+            executionTime: Date.now() - startTime,
+            arbitrageType: opportunity.arbitrageType || 'Direct'
+        };
+    }
+}
+
+// Direct arbitrage execution (original function)
+async function executeDirectArbitrage(opportunity, options = {}, tradeId, startTime) {
     try {
         // Simple validation
         if (!opportunity.symbol || !opportunity.buyPrice || !opportunity.sellPrice) {
@@ -42,7 +86,7 @@ async function executeTrade(opportunity, options = {}) {
             throw new Error('Profit too low');
         }
 
-        logger.log(`🚀 Trading ${opportunity.symbol}`);
+        logger.log(`🚀 Direct Trading ${opportunity.symbol}`);
         logger.log(`   Buy: ${opportunity.buyPrice} | Sell: ${opportunity.sellPrice}`);
         logger.log(`   Expected profit: ${opportunity.profitPercentage.toFixed(2)}%`);
 
@@ -64,13 +108,14 @@ async function executeTrade(opportunity, options = {}) {
             expectedProfit: (opportunity.sellPrice - opportunity.buyPrice) * quantity,
             expectedProfitPercent: opportunity.profitPercentage,
             status: 'pending',
-            tradingMode: config.tradingMode
+            tradingMode: config.tradingMode,
+            arbitrageType: 'Direct'
         });
 
         // Execute the trade - both testnet and live use real API calls
         let result;
 
-        logger.log(`🎯 ${config.tradingMode.toUpperCase()} MODE - REAL API EXECUTION`);
+        logger.log(`🎯 ${config.tradingMode.toUpperCase()} MODE - REAL EXCHANGE EXECUTION`);
         logger.log(`💰 Executing ${quantity.toFixed(8)} ${opportunity.symbol}`);
 
         // Get actual exchange instances
@@ -192,6 +237,7 @@ async function executeTrade(opportunity, options = {}) {
             actualProfitPercentage: (profit / buyTotal) * 100,
             executionTime: Date.now() - startTime,
             tradingMode: config.tradingMode,
+            arbitrageType: 'Direct',
             buyOrder: {
                 exchange: opportunity.buyExchange,
                 orderId: buyOrder.orderId || buyOrder.id || buyOrder.clientOrderId,
@@ -214,7 +260,9 @@ async function executeTrade(opportunity, options = {}) {
         // Update stats and database
         stats.totalTrades++;
         stats.successfulTrades++;
+        stats.directTrades++;
         stats.totalProfit += result.actualProfit;
+        stats.directProfit += result.actualProfit;
 
         await TradeHistoryService.updateTradeRecord(tradeId, {
             status: result.status,
@@ -225,11 +273,11 @@ async function executeTrade(opportunity, options = {}) {
             sellOrderResponse: result.sellOrderResponse || null
         });
 
-        logger.log(`✅ Trade completed: ${result.actualProfit.toFixed(4)} profit`);
+        logger.log(`✅ Direct trade completed: ${result.actualProfit.toFixed(4)} profit`);
         return result;
 
     } catch (error) {
-        logger.error(`❌ Trade failed: ${error.message}`);
+        logger.error(`❌ Direct trade failed: ${error.message}`);
 
         stats.totalTrades++;
 
@@ -237,26 +285,131 @@ async function executeTrade(opportunity, options = {}) {
         await TradeHistoryService.updateTradeRecord(tradeId, {
             status: TRADE_STATUS.FAILED,
             errorMessage: error.message,
-            executionTime: Date.now() - startTime
+            executionTime: Date.now() - startTime,
+            arbitrageType: 'Direct'
         }).catch(() => { });
 
         return {
             tradeId,
             status: TRADE_STATUS.FAILED,
             error: error.message,
-            executionTime: Date.now() - startTime
+            executionTime: Date.now() - startTime,
+            arbitrageType: 'Direct'
         };
     }
 }
 
-// Get stats function
+// Triangular arbitrage execution
+async function executeTriangularArbitrage(opportunity, options = {}, tradeId, startTime) {
+    try {
+        logger.log(`🔺 Triangular Arbitrage Execution: ${opportunity.tradingPath}`);
+
+        // Validate triangular opportunity
+        if (!opportunity.steps || opportunity.steps.length !== 3) {
+            throw new Error('Invalid triangular arbitrage opportunity - missing steps');
+        }
+
+        // Use smaller amount for triangular arbitrage due to complexity
+        const tradeAmount = Math.min(
+            opportunity.capitalAmount || config.maxTriangularTradeAmount,
+            config.maxTriangularTradeAmount
+        );
+
+        // Save to database
+        await TradeHistoryService.saveTradeRecord({
+            tradeId,
+            userId: options.userId || 'default',
+            symbol: opportunity.tradingPath,
+            buyExchange: opportunity.exchange,
+            sellExchange: opportunity.exchange,
+            buyPrice: opportunity.steps[0].price,
+            sellPrice: opportunity.steps[2].price,
+            quantity: tradeAmount / opportunity.steps[0].price,
+            capitalAmount: tradeAmount,
+            expectedProfit: parseFloat(opportunity.netProfitUSDT),
+            expectedProfitPercent: parseFloat(opportunity.profitPercent),
+            status: 'pending',
+            tradingMode: config.tradingMode,
+            arbitrageType: 'Triangular'
+        });
+
+        // Execute triangular arbitrage using the service
+        const result = await triangularService.executeTriangularArbitrage({
+            ...opportunity,
+            capitalAmount: tradeAmount
+        });
+
+        if (result.success) {
+            // Update stats
+            stats.totalTrades++;
+            stats.successfulTrades++;
+            stats.triangularTrades++;
+            stats.totalProfit += result.profit;
+            stats.triangularProfit += result.profit;
+
+            // Update database
+            await TradeHistoryService.updateTradeRecord(tradeId, {
+                status: TRADE_STATUS.COMPLETED,
+                actualProfit: result.profit,
+                actualProfitPercent: result.profitPercent,
+                executionTime: Date.now() - startTime,
+                buyOrderResponse: JSON.stringify(result.steps),
+                sellOrderResponse: JSON.stringify(result)
+            });
+
+            logger.log(`✅ Triangular arbitrage completed: ${result.profit.toFixed(4)} profit`);
+
+            return {
+                tradeId,
+                status: TRADE_STATUS.COMPLETED,
+                actualProfit: result.profit,
+                actualProfitPercentage: result.profitPercent,
+                executionTime: Date.now() - startTime,
+                tradingMode: config.tradingMode,
+                arbitrageType: 'Triangular',
+                steps: result.steps,
+                tradingPath: opportunity.tradingPath
+            };
+        } else {
+            throw new Error(result.error || 'Triangular arbitrage execution failed');
+        }
+
+    } catch (error) {
+        logger.error(`❌ Triangular arbitrage failed: ${error.message}`);
+
+        stats.totalTrades++;
+
+        // Save failure to database
+        await TradeHistoryService.updateTradeRecord(tradeId, {
+            status: TRADE_STATUS.FAILED,
+            errorMessage: error.message,
+            executionTime: Date.now() - startTime,
+            arbitrageType: 'Triangular'
+        }).catch(() => { });
+
+        return {
+            tradeId,
+            status: TRADE_STATUS.FAILED,
+            error: error.message,
+            executionTime: Date.now() - startTime,
+            arbitrageType: 'Triangular'
+        };
+    }
+}
+
+// Get enhanced stats function
 function getStats() {
     return {
         totalTrades: stats.totalTrades,
         successfulTrades: stats.successfulTrades,
         successRate: stats.totalTrades > 0 ? (stats.successfulTrades / stats.totalTrades * 100) : 0,
         totalProfit: stats.totalProfit,
-        mode: config.tradingMode
+        directTrades: stats.directTrades,
+        triangularTrades: stats.triangularTrades,
+        directProfit: stats.directProfit,
+        triangularProfit: stats.triangularProfit,
+        mode: config.tradingMode,
+        triangularEnabled: config.enableTriangularArbitrage
     };
 }
 
@@ -275,11 +428,36 @@ function setTradingMode(mode) {
     logger.log(`🔧 Trading mode changed to: ${mode.toUpperCase()}`);
 }
 
+// Enable/disable triangular arbitrage
+function setTriangularArbitrage(enabled) {
+    config.enableTriangularArbitrage = enabled;
+    logger.log(`🔺 Triangular arbitrage ${enabled ? 'ENABLED' : 'DISABLED'}`);
+}
+
+// Set maximum triangular trade amount
+function setMaxTriangularTradeAmount(amount) {
+    if (amount < 10 || amount > 10000) {
+        throw new Error('Triangular trade amount must be between $10 and $10,000');
+    }
+    config.maxTriangularTradeAmount = amount;
+    logger.log(`🔺 Max triangular trade amount set to: $${amount}`);
+}
+
+// Get triangular arbitrage service instance
+function getTriangularService() {
+    return triangularService;
+}
+
 module.exports = {
     setup,
     executeTrade,
+    executeDirectArbitrage,
+    executeTriangularArbitrage,
     getStats,
     updateConfig,
     setTradingMode,
+    setTriangularArbitrage,
+    setMaxTriangularTradeAmount,
+    getTriangularService,
     TRADE_STATUS
 };

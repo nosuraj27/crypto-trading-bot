@@ -1,10 +1,11 @@
-// Simple Direct Arbitrage Bot - Frontend JavaScript
-// Refactored modular version
+// Complete Arbitrage Bot - Frontend JavaScript
+// Enhanced version supporting Direct & Triangular Arbitrage
 
 class ArbitrageBot {
     constructor() {
         this.socket = io();
         this.currentPage = 'dashboard';
+        this.allOpportunities = [];
 
         this.initializeModules();
         this.initializeElements();
@@ -16,6 +17,9 @@ class ArbitrageBot {
      * Initialize all frontend modules
      */
     initializeModules() {
+        // Initialize notification module first
+        this.notificationModule = new NotificationModule();
+
         // Initialize settings module
         this.settingsModule = new SettingsModule();
 
@@ -46,6 +50,8 @@ class ArbitrageBot {
         this.elements = {
             status: document.getElementById('status'),
             totalOpportunities: document.getElementById('totalOpportunities'),
+            directOpportunities: document.getElementById('directOpportunities'),
+            triangularOpportunities: document.getElementById('triangularOpportunities'),
             bestProfit: document.getElementById('bestProfit'),
             activeExchanges: document.getElementById('activeExchanges'),
             monitoredPairs: document.getElementById('monitoredPairs'),
@@ -62,13 +68,53 @@ class ArbitrageBot {
             item.addEventListener('click', (e) => {
                 const page = e.currentTarget.dataset.page;
                 this.switchPage(page);
+
+                // Close mobile menu if open
+                this.closeMobileMenu();
             });
         });
+
+        // Mobile menu toggle
+        const mobileMenuToggle = document.getElementById('mobileMenuToggle');
+        const navMenu = document.getElementById('navMenu');
+
+        if (mobileMenuToggle && navMenu) {
+            mobileMenuToggle.addEventListener('click', () => {
+                navMenu.classList.toggle('show');
+                const icon = mobileMenuToggle.querySelector('i');
+                icon.classList.toggle('fa-bars');
+                icon.classList.toggle('fa-times');
+            });
+        }
 
         // Listen for settings changes
         window.addEventListener('settingChanged', (e) => {
             this.handleSettingChange(e.detail);
         });
+
+        // Close mobile menu when clicking outside
+        document.addEventListener('click', (e) => {
+            if (navMenu && !e.target.closest('.nav-container')) {
+                this.closeMobileMenu();
+            }
+        });
+    }
+
+    /**
+     * Close mobile menu
+     */
+    closeMobileMenu() {
+        const navMenu = document.getElementById('navMenu');
+        const mobileMenuToggle = document.getElementById('mobileMenuToggle');
+
+        if (navMenu && mobileMenuToggle) {
+            navMenu.classList.remove('show');
+            const icon = mobileMenuToggle.querySelector('i');
+            if (icon) {
+                icon.classList.add('fa-bars');
+                icon.classList.remove('fa-times');
+            }
+        }
     }
 
     /**
@@ -76,15 +122,18 @@ class ArbitrageBot {
      */
     setupSocketEvents() {
         this.socket.on('connect', () => {
-            this.updateStatus('connected', '<i class="fas fa-check-circle"></i> Connected - Live Data');
+            this.updateStatus('connected', '<i class="fas fa-check-circle"></i> <span>Connected - Live Data</span>');
+            this.notificationModule.success('Connected to live data feed');
         });
 
         this.socket.on('disconnect', () => {
-            this.updateStatus('disconnected', '<i class="fas fa-exclamation-triangle"></i> Disconnected - Reconnecting...');
+            this.updateStatus('disconnected', '<i class="fas fa-exclamation-triangle"></i> <span>Disconnected - Reconnecting...</span>');
+            this.notificationModule.warning('Connection lost - attempting to reconnect...');
         });
 
         this.socket.on('connect_error', () => {
-            this.updateStatus('disconnected', '<i class="fas fa-times-circle"></i> Connection Failed');
+            this.updateStatus('disconnected', '<i class="fas fa-times-circle"></i> <span>Connection Failed</span>');
+            this.notificationModule.error('Failed to connect to server');
         });
 
         this.socket.on('priceUpdate', (data) => {
@@ -93,7 +142,8 @@ class ArbitrageBot {
 
         this.socket.on('error', (error) => {
             console.error('Socket.IO error:', error);
-            this.updateStatus('error', '<i class="fas fa-exclamation-triangle"></i> Connection Error');
+            this.updateStatus('error', '<i class="fas fa-exclamation-triangle"></i> <span>Connection Error</span>');
+            this.notificationModule.error('WebSocket connection error');
         });
     }
 
@@ -114,11 +164,31 @@ class ArbitrageBot {
      * @param {string} pageName - Page identifier
      */
     switchPage(pageName) {
+        console.log(`Switching to page: ${pageName}`);
+
         // Update navigation
         document.querySelectorAll('.nav-item').forEach(item => {
             item.classList.remove('active');
         });
-        const activeNavItem = document.querySelector(`[data-page="${pageName}"]`);
+
+        // Find the correct nav item by data-page attribute OR by checking the onclick handler
+        let activeNavItem = document.querySelector(`[data-page="${pageName}"]`);
+        if (!activeNavItem) {
+            // Fallback: find by text content or onclick
+            const navItems = document.querySelectorAll('.nav-item');
+            navItems.forEach(item => {
+                const text = item.textContent.toLowerCase();
+                if ((pageName === 'dashboard' && text.includes('dashboard')) ||
+                    (pageName === 'market' && text.includes('market')) ||
+                    (pageName === 'direct' && text.includes('direct')) ||
+                    (pageName === 'triangular' && text.includes('triangular')) ||
+                    (pageName === 'history' && text.includes('history')) ||
+                    (pageName === 'settings' && text.includes('settings'))) {
+                    activeNavItem = item;
+                }
+            });
+        }
+
         if (activeNavItem) {
             activeNavItem.classList.add('active');
         }
@@ -127,16 +197,31 @@ class ArbitrageBot {
         document.querySelectorAll('.page').forEach(page => {
             page.classList.remove('active');
         });
-        const activePage = document.getElementById(`${pageName}-page`);
+
+        let activePage = document.getElementById(`${pageName}-page`);
+        if (!activePage) {
+            // Fallback to dashboard
+            activePage = document.getElementById('dashboard-page');
+            pageName = 'dashboard';
+        }
+
         if (activePage) {
             activePage.classList.add('active');
         }
 
-        // Initialize trade history module when history page is shown
+        // Initialize modules based on page
         if (pageName === 'history' && !window.tradeHistoryModule) {
-            // Wait for DOM to be ready
             setTimeout(() => {
-                window.tradeHistoryModule = new TradeHistoryModule();
+                if (typeof TradeHistoryModule !== 'undefined') {
+                    window.tradeHistoryModule = new TradeHistoryModule();
+                }
+            }, 100);
+        }
+
+        // Load balances when balances page is shown
+        if (pageName === 'balances') {
+            setTimeout(() => {
+                this.loadBalances();
             }, 100);
         }
 
@@ -148,7 +233,10 @@ class ArbitrageBot {
      * @param {Object} data - Price update data
      */
     handlePriceUpdate(data) {
-        const { opportunities, timestamp, prices, stats, tradingPairs, exchangeConfig } = data;
+        const { opportunities, directOpportunities, triangularOpportunities, timestamp, prices, stats, tradingPairs, exchangeConfig } = data;
+
+        // Store all opportunities
+        this.allOpportunities = opportunities || [];
 
         // Update exchange config if provided
         if (exchangeConfig) {
@@ -170,17 +258,26 @@ class ArbitrageBot {
             this.marketDataModule.updateConfig(this.exchangeConfig, this.cryptoConfig);
         }
 
-        // Update statistics
-        this.updateStatistics(opportunities, stats, tradingPairs);
+        // Update statistics with enhanced data
+        this.updateStatistics(opportunities, directOpportunities, triangularOpportunities, stats, tradingPairs);
 
         // Update market prices
         if (this.marketDataModule && prices) {
             this.marketDataModule.updateMarketPrices(prices);
         }
 
-        // Update opportunities
-        if (this.opportunitiesModule && opportunities) {
-            this.opportunitiesModule.updateOpportunities(opportunities);
+        // Update opportunities display
+        if (this.opportunitiesModule) {
+            // Separate direct and triangular opportunities
+            const directOpps = this.allOpportunities.filter(opp =>
+                opp.arbitrageType === 'Direct' || (!opp.arbitrageType && opp.buyExchange !== opp.sellExchange)
+            );
+            const triangularOpps = this.allOpportunities.filter(opp =>
+                opp.arbitrageType === 'Triangular'
+            );
+
+            // Always show all opportunities on dashboard
+            this.opportunitiesModule.updateOpportunities(this.allOpportunities, directOpps, triangularOpps);
         }
 
         // Update timestamp
@@ -193,21 +290,36 @@ class ArbitrageBot {
     }
 
     /**
-     * Update statistics display
-     * @param {Array} opportunities - Arbitrage opportunities
+     * Update statistics display with enhanced arbitrage data
+     * @param {Array} opportunities - All arbitrage opportunities
+     * @param {Array} directOpportunities - Direct arbitrage opportunities
+     * @param {Array} triangularOpportunities - Triangular arbitrage opportunities
      * @param {Object} stats - Statistics object
      * @param {Array} tradingPairs - Trading pairs array
      */
-    updateStatistics(opportunities, stats, tradingPairs) {
+    updateStatistics(opportunities, directOpportunities, triangularOpportunities, stats, tradingPairs) {
+        // Total opportunities
         if (this.elements.totalOpportunities) {
             this.elements.totalOpportunities.textContent = opportunities ? opportunities.length : 0;
         }
 
+        // Direct opportunities
+        if (this.elements.directOpportunities) {
+            this.elements.directOpportunities.textContent = directOpportunities ? directOpportunities.length : 0;
+        }
+
+        // Triangular opportunities
+        if (this.elements.triangularOpportunities) {
+            this.elements.triangularOpportunities.textContent = triangularOpportunities ? triangularOpportunities.length : 0;
+        }
+
+        // Best profit from all opportunities
         if (this.elements.bestProfit) {
             this.elements.bestProfit.textContent = opportunities && opportunities.length > 0 ?
                 opportunities[0].profitPercent + '%' : '0.00%';
         }
 
+        // Active exchanges
         if (this.elements.activeExchanges) {
             const enabledExchangeCount = Object.keys(this.exchangeConfig).filter(exchange =>
                 this.exchangeConfig[exchange].enabled
@@ -215,6 +327,7 @@ class ArbitrageBot {
             this.elements.activeExchanges.textContent = stats ? stats.activeExchanges : enabledExchangeCount;
         }
 
+        // Monitored pairs
         if (this.elements.monitoredPairs) {
             this.elements.monitoredPairs.textContent = tradingPairs ? tradingPairs.length : 5;
         }
@@ -327,6 +440,148 @@ class ArbitrageBot {
     requestUpdate() {
         this.socket.emit('requestUpdate');
     }
+
+    /**
+     * Load and display exchange balances
+     */
+    async loadBalances() {
+        try {
+            const balancesContent = document.getElementById('balancesContent');
+            if (!balancesContent) return;
+
+            // Show loading state
+            balancesContent.innerHTML = `
+                <div class="loading-state">
+                    <i class="fas fa-spinner fa-spin"></i> Loading balances...
+                </div>
+            `;
+
+            const response = await fetch('/api/exchanges/balances');
+            const result = await response.json();
+
+            if (result.success) {
+                this.displayBalances(result.data);
+            } else {
+                balancesContent.innerHTML = `
+                    <div class="error-state">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <p>Failed to load balances: ${result.error || 'Unknown error'}</p>
+                        <button class="btn" onclick="refreshBalances()">Try Again</button>
+                    </div>
+                `;
+            }
+        } catch (error) {
+            console.error('❌ Error loading balances:', error);
+            const balancesContent = document.getElementById('balancesContent');
+            if (balancesContent) {
+                balancesContent.innerHTML = `
+                    <div class="error-state">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <p>Network error loading balances</p>
+                        <button class="btn" onclick="refreshBalances()">Try Again</button>
+                    </div>
+                `;
+            }
+        }
+    }
+
+    /**
+     * Display exchange balances in cards
+     */
+    displayBalances(data) {
+        const balancesContent = document.getElementById('balancesContent');
+        if (!balancesContent) return;
+
+        const { balances, errors } = data;
+        let html = '';
+
+        // Show balances for each exchange
+        Object.entries(balances).forEach(([exchange, balance]) => {
+            const exchangeName = exchange.charAt(0).toUpperCase() + exchange.slice(1);
+            const balanceEntries = Object.entries(balance);
+
+            html += `
+                <div class="balance-card">
+                    <div class="balance-header">
+                        <h3>
+                            <i class="fas fa-exchange-alt"></i>
+                            ${exchangeName}
+                        </h3>
+                        <span class="testnet-badge">TESTNET</span>
+                    </div>
+                    <div class="balance-content">
+            `;
+
+            if (balanceEntries.length === 0) {
+                html += `
+                    <div class="no-balance">
+                        <i class="fas fa-info-circle"></i>
+                        <p>No balances found</p>
+                    </div>
+                `;
+            } else {
+                balanceEntries.forEach(([currency, amount]) => {
+                    const formattedAmount = parseFloat(amount).toFixed(8);
+                    html += `
+                        <div class="balance-item">
+                            <div class="currency-info">
+                                <span class="currency">${currency}</span>
+                            </div>
+                            <div class="amount-info">
+                                <span class="amount">${formattedAmount}</span>
+                            </div>
+                        </div>
+                    `;
+                });
+            }
+
+            html += `
+                    </div>
+                </div>
+            `;
+        });
+
+        // Show errors for failed exchanges
+        Object.entries(errors).forEach(([exchange, error]) => {
+            const exchangeName = exchange.charAt(0).toUpperCase() + exchange.slice(1);
+            const errorMessage = typeof error === 'object'
+                ? (error.message || JSON.stringify(error))
+                : String(error);
+
+            html += `
+                <div class="balance-card error">
+                    <div class="balance-header">
+                        <h3>
+                            <i class="fas fa-exclamation-triangle"></i>
+                            ${exchangeName}
+                        </h3>
+                        <span class="error-badge">ERROR</span>
+                    </div>
+                    <div class="balance-content">
+                        <div class="error-message">
+                            <p>${errorMessage}</p>
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+
+        if (html === '') {
+            html = `
+                <div class="no-exchanges">
+                    <i class="fas fa-info-circle"></i>
+                    <p>No exchanges connected</p>
+                </div>
+            `;
+        }
+
+        balancesContent.innerHTML = html;
+
+        // Show success notification
+        if (Object.keys(balances).length > 0) {
+            this.notificationModule.success(`Loaded balances from ${Object.keys(balances).length} exchange(s)`);
+        }
+    }
 }
 
 // Global functions for button events (maintain compatibility)
@@ -335,7 +590,7 @@ function refreshData() {
         window.arbitrageBot.requestUpdate();
 
         // Visual feedback
-        const btn = event.target.closest('.btn');
+        const btn = event?.target?.closest('.btn');
         if (btn) {
             const icon = btn.querySelector('i');
             if (icon) {
@@ -351,7 +606,7 @@ function toggleSound() {
         const currentSetting = window.arbitrageBot.settingsModule.getSetting('soundEnabled');
         window.arbitrageBot.settingsModule.updateSetting('soundEnabled', !currentSetting);
 
-        const btn = event.target.closest('.btn');
+        const btn = event?.target?.closest('.btn');
         if (btn) {
             const icon = btn.querySelector('i');
             if (icon) {
@@ -361,6 +616,16 @@ function toggleSound() {
         }
     }
 }
+
+// Navigation functions for navbar
+function switchToPage(pageName) {
+    if (window.arbitrageBot) {
+        window.arbitrageBot.switchPage(pageName);
+    }
+}
+
+// Global navigation handlers
+window.switchToPage = switchToPage;
 
 // Trade execution functions (maintain compatibility)
 function executeBuyOrder(pair, exchange, price) {
@@ -444,13 +709,35 @@ function toggleSound() {
     }
 }
 
+function refreshBalances() {
+    if (window.arbitrageBot) {
+        window.arbitrageBot.loadBalances();
+
+        // Visual feedback
+        const btn = event?.target?.closest('.btn');
+        if (btn) {
+            const icon = btn.querySelector('i');
+            if (icon) {
+                icon.classList.add('fa-spin');
+                setTimeout(() => icon.classList.remove('fa-spin'), 1000);
+            }
+        }
+    }
+}
+
 // Initialize the application when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
     window.arbitrageBot = new ArbitrageBot();
 
-    // Expose modules globally for onclick handlers
+    // Expose modules globally for onclick handlers and easy access
     window.opportunitiesModule = window.arbitrageBot.opportunitiesModule;
     window.settingsModule = window.arbitrageBot.settingsModule;
+    window.notificationModule = window.arbitrageBot.notificationModule;
 
-    console.log('🚀 Simple Direct Arbitrage Bot Frontend Initialized (Modular Version)');
+    console.log('🚀 Crypto Bot Frontend Initialized (Enhanced UI Version)');
+
+    // Show welcome notification
+    setTimeout(() => {
+        window.notificationModule.info('Welcome to Crypto Bot! 🚀', 3000);
+    }, 1000);
 });

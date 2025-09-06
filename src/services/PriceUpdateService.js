@@ -1,16 +1,22 @@
 /**
- * Price Update Service
- * Manages price fetching and arbitrage calculation
+ * Enhanced Price Update Service
+ * Manages price fetching and both direct & triangular arbitrage calculation
  */
 
 const ExchangeFactory = require('../exchanges/ExchangeFactory');
 const TradingPairsService = require('./TradingPairsService');
 const ArbitrageCalculator = require('../utils/arbitrage');
+const TriangularArbitrageService = require('./TriangularArbitrageService');
 const HttpUtils = require('../utils/http');
+
+// Initialize triangular arbitrage service
+const triangularService = new TriangularArbitrageService();
 
 class PriceUpdateService {
     static exchangePrices = {};
     static arbitrageOpportunities = [];
+    static triangularOpportunities = [];
+    static allOpportunities = [];
     static lastUpdateTime = null;
 
     /**
@@ -51,25 +57,44 @@ class PriceUpdateService {
                 console.warn(`⚠️  Failed to fetch from: ${failedExchanges.join(', ')}`);
             }
 
-            // Calculate arbitrage opportunities
-            this.arbitrageOpportunities = ArbitrageCalculator.calculateArbitrage(this.exchangePrices, tradingPairs);
+            // Calculate both direct and triangular arbitrage opportunities
+            this.arbitrageOpportunities = ArbitrageCalculator.calculateDirectArbitrage(this.exchangePrices, tradingPairs);
+
+            // Calculate triangular arbitrage opportunities for each exchange
+            this.triangularOpportunities = [];
+            for (const exchange in this.exchangePrices) {
+                const triangularOps = triangularService.analyzeTriangularOpportunities(this.exchangePrices, exchange);
+                this.triangularOpportunities.push(...triangularOps);
+            }
+
+            // Combine all opportunities and sort by profit
+            this.allOpportunities = [...this.arbitrageOpportunities, ...this.triangularOpportunities]
+                .sort((a, b) => parseFloat(b.profitPercent) - parseFloat(a.profitPercent));
+
             this.lastUpdateTime = new Date().toISOString();
 
-            const opportunityCount = this.arbitrageOpportunities.length;
+            const directOpportunityCount = this.arbitrageOpportunities.length;
+            const triangularOpportunityCount = this.triangularOpportunities.length;
+            const totalOpportunityCount = this.allOpportunities.length;
             const activeExchangeCount = Object.keys(this.exchangePrices).filter(ex => Object.keys(this.exchangePrices[ex]).length > 0).length;
 
-            console.log(`✅ Update complete: ${opportunityCount} opportunities found across ${activeExchangeCount}/${exchangeFetchers.length} enabled exchanges in ${Date.now() - startTime}ms`);
+            console.log(`✅ Update complete: ${totalOpportunityCount} total opportunities (${directOpportunityCount} direct, ${triangularOpportunityCount} triangular) across ${activeExchangeCount}/${exchangeFetchers.length} enabled exchanges in ${Date.now() - startTime}ms`);
 
             return {
                 prices: this.exchangePrices,
-                opportunities: this.arbitrageOpportunities,
+                opportunities: this.allOpportunities, // Return combined opportunities
+                directOpportunities: this.arbitrageOpportunities,
+                triangularOpportunities: this.triangularOpportunities,
                 tradingPairs: tradingPairs,
                 timestamp: this.lastUpdateTime,
                 stats: {
                     updateTime: Date.now() - startTime,
                     apiCalls: HttpUtils.getApiCallCount(),
                     activeExchanges: activeExchangeCount,
-                    enabledExchanges: exchangeFetchers.length
+                    enabledExchanges: exchangeFetchers.length,
+                    directOpportunities: directOpportunityCount,
+                    triangularOpportunities: triangularOpportunityCount,
+                    totalOpportunities: totalOpportunityCount
                 }
             };
 
@@ -80,19 +105,24 @@ class PriceUpdateService {
     }
 
     /**
-     * Get current market data
+     * Get current market data with both direct and triangular opportunities
      * @returns {Object} - Current market data
      */
     static getCurrentData() {
         return {
             prices: this.exchangePrices,
-            opportunities: this.arbitrageOpportunities,
+            opportunities: this.allOpportunities, // Return combined opportunities
+            directOpportunities: this.arbitrageOpportunities,
+            triangularOpportunities: this.triangularOpportunities,
             tradingPairs: TradingPairsService.getTradingPairs(),
             timestamp: this.lastUpdateTime || new Date().toISOString(),
             stats: {
                 apiCalls: HttpUtils.getApiCallCount(),
                 activeExchanges: Object.keys(this.exchangePrices).filter(ex => Object.keys(this.exchangePrices[ex]).length > 0).length,
-                monitoredPairs: TradingPairsService.getTradingPairs().length
+                monitoredPairs: TradingPairsService.getTradingPairs().length,
+                directOpportunities: this.arbitrageOpportunities.length,
+                triangularOpportunities: this.triangularOpportunities.length,
+                totalOpportunities: this.allOpportunities.length
             }
         };
     }
@@ -118,11 +148,23 @@ class PriceUpdateService {
         }
 
         if (hasSignificantChanges) {
-            // Recalculate arbitrage opportunities
-            this.arbitrageOpportunities = ArbitrageCalculator.calculateArbitrage(
+            // Recalculate both direct and triangular arbitrage opportunities
+            this.arbitrageOpportunities = ArbitrageCalculator.calculateDirectArbitrage(
                 this.exchangePrices,
                 TradingPairsService.getTradingPairs()
             );
+
+            // Recalculate triangular opportunities
+            this.triangularOpportunities = [];
+            for (const exchangeName in this.exchangePrices) {
+                const triangularOps = triangularService.analyzeTriangularOpportunities(this.exchangePrices, exchangeName);
+                this.triangularOpportunities.push(...triangularOps);
+            }
+
+            // Combine all opportunities
+            this.allOpportunities = [...this.arbitrageOpportunities, ...this.triangularOpportunities]
+                .sort((a, b) => parseFloat(b.profitPercent) - parseFloat(a.profitPercent));
+
             this.lastUpdateTime = new Date().toISOString();
         }
 

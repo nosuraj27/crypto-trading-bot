@@ -20,7 +20,7 @@ const APP_CONFIG = {
     // Trading Configuration
     trading: {
         defaultCapital: 2000,
-        minProfitThreshold: 0.001,
+        minProfitThreshold: 0.1, // 0.1% minimum profit threshold
         maxTradingPairs: 100,
         topPairsToShow: 100,
         broadcastThrottleMs: 500 // 500 milliseconds - How often to broadcast updates

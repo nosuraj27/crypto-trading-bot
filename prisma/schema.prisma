@@ -21,19 +21,20 @@ model UserSetting {
 model TradeHistory {
   id                    Int       @id @default(autoincrement())
   tradeId               String    @unique
-  userId                String    @default("default")
-  symbol                String
-  buyExchange           String
-  sellExchange          String
-  buyPrice              Float
-  sellPrice             Float
-  quantity              Float
-  capitalAmount         Float
-  expectedProfit        Float
-  expectedProfitPercent Float
+  userId                String?   @default("default")
+  symbol                String?
+  buyExchange           String?
+  sellExchange          String?
+  arbitrageType         String?
+  buyPrice              Float?
+  sellPrice             Float?
+  quantity              Float?
+  capitalAmount         Float?
+  expectedProfit        Float?
+  expectedProfitPercent Float?
   actualProfit          Float?
   actualProfitPercent   Float?
-  status                String // pending, executing, completed, failed, cancelled
+  status                String? // pending, executing, completed, failed, cancelled
   buyOrderId            String?
   sellOrderId           String?
   buySlippage           Float?
@@ -44,7 +45,7 @@ model TradeHistory {
   errorMessage          String?
   buyOrderResponse      String? // JSON string of buy exchange response
   sellOrderResponse     String? // JSON string of sell exchange response
-  simulation            Boolean   @default(true)
+  tradingMode           String?   @default("testnet") // testnet or live
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
   completedAt           DateTime?

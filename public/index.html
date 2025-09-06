@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Direct Arbitrage Bot - Live Trading</title>
+    <title>Crypto Bot - Live Trading</title>
     <script src="/socket.io/socket.io.js"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link rel="stylesheet" href="/css/style.css">
@@ -15,29 +15,50 @@
     <nav class="top-nav">
         <div class="nav-container">
             <div class="nav-brand">
-                <i class="fas fa-rocket"></i>
-                <span>Arbitrage Bot</span>
+                <i class="fas fa-chart-line-up"></i>
+                <span>Crypto Bot</span>
             </div>
-            <div class="nav-menu">
+
+            <!-- Mobile Menu Toggle -->
+            <button class="mobile-menu-toggle" id="mobileMenuToggle">
+                <i class="fas fa-bars"></i>
+            </button>
+
+            <div class="nav-menu" id="navMenu">
                 <button class="nav-item active" data-page="dashboard">
-                    <i class="fas fa-tachometer-alt"></i> Dashboard
+                    <i class="fas fa-tachometer-alt"></i>
+                    <span>Dashboard</span>
                 </button>
                 <button class="nav-item" data-page="market">
-                    <i class="fas fa-chart-line"></i> Market
+                    <i class="fas fa-chart-line"></i>
+                    <span>Markets</span>
                 </button>
-                <button class="nav-item" data-page="opportunities">
-                    <i class="fas fa-search-dollar"></i> Opportunities
+                <button class="nav-item" data-page="direct-opportunities">
+                    <i class="fas fa-exchange-alt"></i>
+                    <span>Direct Trades</span>
+                </button>
+                <button class="nav-item" data-page="triangular-opportunities">
+                    <i class="fas fa-project-diagram"></i>
+                    <span>Triangular</span>
+                </button>
+                <button class="nav-item" data-page="balances">
+                    <i class="fas fa-wallet"></i>
+                    <span>Balances</span>
                 </button>
                 <button class="nav-item" data-page="history">
-                    <i class="fas fa-history"></i> History
+                    <i class="fas fa-history"></i>
+                    <span>History</span>
                 </button>
                 <button class="nav-item" data-page="settings">
-                    <i class="fas fa-cog"></i> Settings
+                    <i class="fas fa-cog"></i>
+                    <span>Settings</span>
                 </button>
             </div>
+
             <div class="nav-status">
                 <div id="status" class="status disconnected">
-                    <i class="fas fa-spinner fa-spin"></i> Connecting...
+                    <i class="fas fa-spinner fa-spin"></i>
+                    <span>Connecting...</span>
                 </div>
             </div>
         </div>
@@ -47,40 +68,60 @@
         <!-- Dashboard Page -->
         <div id="dashboard-page" class="page active">
             <div class="header">
-                <h1><i class="fas fa-rocket"></i> Direct Arbitrage Bot</h1>
-                <p>Buy Low on One Exchange → Sell High on Another Exchange</p>
+                <h1><i class="fas fa-rocket"></i> Crypto Arbitrage Dashboard</h1>
+                <p>Real-time arbitrage opportunities across multiple exchanges</p>
                 <div class="info-banner">
-                    <small>
-                        <i class="fas fa-info-circle"></i>
-                        Direct Arbitrage: Buy cryptocurrency at the lowest price and sell at the
-                        highest price across exchanges.
-                    </small>
+                    <i class="fas fa-info-circle"></i>
+                    <strong>Direct:</strong> Buy low on one exchange, sell high on another.
+                    <strong>Triangular:</strong> Multi-step trades within one exchange.
                 </div>
             </div>
 
+            <!-- Quick Stats -->
             <div class="stats-bar">
                 <div class="stat-item">
-                    <div class="stat-value" id="totalOpportunities">0</div>
-                    <div class="stat-label">Opportunities Found</div>
+                    <div class="stat-icon"><i class="fas fa-search-dollar"></i></div>
+                    <div class="stat-content">
+                        <div class="stat-value" id="totalOpportunities">0</div>
+                        <div class="stat-label">Total Opportunities</div>
+                    </div>
                 </div>
                 <div class="stat-item">
-                    <div class="stat-value" id="bestProfit">0.00%</div>
-                    <div class="stat-label">Best Profit</div>
+                    <div class="stat-icon"><i class="fas fa-exchange-alt"></i></div>
+                    <div class="stat-content">
+                        <div class="stat-value" id="directOpportunities">0</div>
+                        <div class="stat-label">Direct Arbitrage</div>
+                    </div>
                 </div>
                 <div class="stat-item">
-                    <div class="stat-value" id="activeExchanges">3</div>
-                    <div class="stat-label">Active Exchanges</div>
+                    <div class="stat-icon"><i class="fas fa-project-diagram"></i></div>
+                    <div class="stat-content">
+                        <div class="stat-value" id="triangularOpportunities">0</div>
+                        <div class="stat-label">Triangular Arbitrage</div>
+                    </div>
                 </div>
                 <div class="stat-item">
-                    <div class="stat-value" id="monitoredPairs">5</div>
-                    <div class="stat-label">Monitored Pairs</div>
+                    <div class="stat-icon"><i class="fas fa-percentage"></i></div>
+                    <div class="stat-content">
+                        <div class="stat-value" id="bestProfit">0.00%</div>
+                        <div class="stat-label">Best Profit</div>
+                    </div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-icon"><i class="fas fa-exchange"></i></div>
+                    <div class="stat-content">
+                        <div class="stat-value" id="activeExchanges">0</div>
+                        <div class="stat-label">Active Exchanges</div>
+                    </div>
                 </div>
             </div>
 
-            <div id="opportunitiesContent" class="grid">
-                <!-- <div class="spinner"><i class="fas fa-chart-line fa-spin"></i></div>
-                <h2>Loading arbitrage opportunities...</h2>
-                <p>Scanning exchanges for profitable trades</p> -->
+            <!-- Opportunities List -->
+            <div id="opportunitiesContent" class="opportunities-grid">
+                <div class="loading-placeholder">
+                    <i class="fas fa-spinner fa-spin"></i>
+                    <p>Loading opportunities...</p>
+                </div>
             </div>
         </div>
 
@@ -91,26 +132,55 @@
                 <p>Real-time cryptocurrency prices across all exchanges</p>
             </div>
             <div id="marketPrices" class="market-grid">
-                <!-- Dynamic market prices will be loaded here -->
+                <div class="loading-placeholder">
+                    <i class="fas fa-spinner fa-spin"></i>
+                    <p>Loading market data...</p>
+                </div>
             </div>
         </div>
 
-        <!-- Opportunities Page -->
-        <div id="opportunities-page" class="page">
+        <!-- Direct Opportunities Page -->
+        <div id="direct-opportunities-page" class="page">
             <div class="page-header">
-                <h2><i class="fas fa-search-dollar"></i> Arbitrage Opportunities</h2>
-                <p>Current profitable trading opportunities</p>
+                <h2><i class="fas fa-exchange-alt"></i> Direct Arbitrage</h2>
+                <p>Buy on one exchange, sell on another for instant profit</p>
             </div>
-            <div class="controls">
-                <button class="btn" onclick="refreshData()">
-                    <i class="fas fa-refresh"></i> Refresh
-                </button>
-                <button class="btn" onclick="toggleSound()">
-                    <i class="fas fa-volume-up"></i> Sound Alerts
-                </button>
+
+            <div id="directOpportunitiesList" class="opportunities-grid">
+                <div class="loading-placeholder">
+                    <i class="fas fa-spinner fa-spin"></i>
+                    <p>Scanning for direct arbitrage opportunities...</p>
+                </div>
             </div>
-            <div id="opportunitiesList" class="grid">
-                <!-- Opportunities will be loaded here -->
+        </div>
+
+        <!-- Triangular Opportunities Page -->
+        <div id="triangular-opportunities-page" class="page">
+            <div class="page-header">
+                <h2><i class="fas fa-project-diagram"></i> Triangular Arbitrage</h2>
+                <p>Multi-step trading within single exchange for complex profits</p>
+            </div>
+
+            <div id="triangularOpportunitiesList" class="opportunities-grid">
+                <div class="loading-placeholder">
+                    <i class="fas fa-spinner fa-spin"></i>
+                    <p>Analyzing triangular arbitrage patterns...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Balances Page -->
+        <div id="balances-page" class="page">
+            <div class="page-header">
+                <h2><i class="fas fa-wallet"></i> Exchange Balances</h2>
+                <p>View your account balances across all connected exchanges</p>
+            </div>
+
+            <div id="balancesContent" class="balances-grid">
+                <div class="loading-placeholder">
+                    <i class="fas fa-spinner fa-spin"></i>
+                    <p>Loading exchange balances...</p>
+                </div>
             </div>
         </div>
 
@@ -297,17 +367,47 @@
         </div>
 
         <div id="timestamp" class="timestamp">
-            <i class="fas fa-clock"></i> <span id="timestampText">Waiting for data...</span>
+            <i class="fas fa-clock"></i>
+            <span id="timestampText">Waiting for data...</span>
         </div>
     </div>
 
+    <!-- Mobile Menu Script -->
+    <script>
+        // Mobile menu toggle
+        document.addEventListener('DOMContentLoaded', function () {
+            const mobileMenuToggle = document.getElementById('mobileMenuToggle');
+            const navMenu = document.getElementById('navMenu');
+
+            if (mobileMenuToggle && navMenu) {
+                mobileMenuToggle.addEventListener('click', function () {
+                    navMenu.classList.toggle('show');
+                    const icon = this.querySelector('i');
+                    icon.classList.toggle('fa-bars');
+                    icon.classList.toggle('fa-times');
+                });
+            }
+
+            // Close mobile menu when clicking on nav items
+            document.querySelectorAll('.nav-item').forEach(item => {
+                item.addEventListener('click', () => {
+                    navMenu.classList.remove('show');
+                    const icon = mobileMenuToggle.querySelector('i');
+                    icon.classList.add('fa-bars');
+                    icon.classList.remove('fa-times');
+                });
+            });
+        });
+    </script>
+
     <!-- Load modules first -->
+    <script src="/js/modules/NotificationModule.js"></script>
     <script src="/js/modules/SettingsModule.js"></script>
     <script src="/js/modules/MarketDataModule.js"></script>
     <script src="/js/modules/OpportunitiesModule.js"></script>
     <script src="/js/modules/TradeHistoryModule.js"></script>
 
-    <!-- Load main app (can use either version) -->
+    <!-- Load main app -->
     <script src="/js/app.js"></script>
 </body>
 

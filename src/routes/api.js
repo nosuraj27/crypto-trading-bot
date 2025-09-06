@@ -527,9 +527,8 @@ router.get('/exchanges/balances', async (req, res) => {
         const errors = {};
 
         await Promise.allSettled(
-            Array.from(enabledExchanges).map(async (exchangeName) => {
+            Array.from(enabledExchanges.entries()).map(async ([exchangeName, exchange]) => {
                 try {
-                    const exchange = ExchangeFactory.getExchange(exchangeName);
                     if (exchange && typeof exchange.getBalance === 'function') {
                         balances[exchangeName] = await exchange.getBalance();
                     } else {

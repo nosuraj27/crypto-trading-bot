@@ -228,7 +228,8 @@ class TradeHistoryModule {
         const date = new Date(trade.createdAt).toLocaleDateString();
         const time = new Date(trade.createdAt).toLocaleTimeString();
         const statusClass = this.getStatusClass(trade.status);
-        const profitClass = trade.actualProfit >= 0 ? 'profit-positive' : 'profit-negative';
+        const actualProfit = trade.actualProfit || 0;
+        const profitClass = actualProfit >= 0 ? 'profit-positive' : 'profit-negative';
 
         return `
             <tr class="trade-row" data-trade-id="${trade.tradeId}">
@@ -238,26 +239,26 @@ class TradeHistoryModule {
                 </td>
                 <td class="trade-id-cell">
                     <span class="trade-id" title="${trade.tradeId}">${trade.tradeId.substr(0, 8)}...</span>
-                    ${trade.simulation ? '<span class="simulation-badge">SIM</span>' : ''}
+                    <span class="trading-mode-badge ${trade.tradingMode || 'testnet'}">${(trade.tradingMode || 'testnet').toUpperCase()}</span>
                 </td>
-                <td class="symbol-cell">${trade.symbol}</td>
+                <td class="symbol-cell">${trade.symbol || 'N/A'}</td>
                 <td class="exchange-cell">
-                    <span class="exchange-badge buy">${trade.buyExchange}</span>
+                    <span class="exchange-badge buy">${trade.buyExchange || 'N/A'}</span>
                 </td>
                 <td class="exchange-cell">
-                    <span class="exchange-badge sell">${trade.sellExchange}</span>
+                    <span class="exchange-badge sell">${trade.sellExchange || 'N/A'}</span>
                 </td>
-                <td class="capital-cell">$${trade.capitalAmount.toFixed(2)}</td>
+                <td class="capital-cell">$${(trade.capitalAmount || 0).toFixed(2)}</td>
                 <td class="profit-cell">
                     <div class="profit-amount ${profitClass}">
-                        $${(trade.actualProfit || trade.expectedProfit).toFixed(4)}
+                        $${((trade.actualProfit !== null && trade.actualProfit !== undefined) ? trade.actualProfit : (trade.expectedProfit || 0)).toFixed(4)}
                     </div>
                     <div class="profit-percent ${profitClass}">
-                        ${(trade.actualProfitPercent || trade.expectedProfitPercent).toFixed(2)}%
+                        ${((trade.actualProfitPercent !== null && trade.actualProfitPercent !== undefined) ? trade.actualProfitPercent : (trade.expectedProfitPercent || 0)).toFixed(2)}%
                     </div>
                 </td>
                 <td class="status-cell">
-                    <span class="status-badge ${statusClass}">${trade.status.toUpperCase()}</span>
+                    <span class="status-badge ${statusClass}">${(trade.status || 'unknown').toUpperCase()}</span>
                 </td>
                 <td class="actions-cell">
                     <button class="btn btn-small" onclick="tradeHistoryModule.viewTradeDetails('${trade.tradeId}')">
@@ -457,29 +458,29 @@ class TradeHistoryModule {
                             </div>
                             <div class="info-group">
                                 <label>Buy Price:</label>
-                                <span>$${trade.buyPrice.toFixed(6)}</span>
+                                <span>$${(trade.buyPrice || 0).toFixed(6)}</span>
                             </div>
                             <div class="info-group">
                                 <label>Sell Price:</label>
-                                <span>$${trade.sellPrice.toFixed(6)}</span>
+                                <span>$${(trade.sellPrice || 0).toFixed(6)}</span>
                             </div>
                             <div class="info-group">
                                 <label>Quantity:</label>
-                                <span>${trade.quantity.toFixed(8)}</span>
+                                <span>${(trade.quantity || 0).toFixed(8)}</span>
                             </div>
                             <div class="info-group">
                                 <label>Capital:</label>
-                                <span>$${trade.capitalAmount.toFixed(2)}</span>
+                                <span>$${(trade.capitalAmount || 0).toFixed(2)}</span>
                             </div>
                             <div class="info-group">
                                 <label>Expected Profit:</label>
-                                <span>$${trade.expectedProfit.toFixed(4)} (${trade.expectedProfitPercent.toFixed(2)}%)</span>
+                                <span>$${(trade.expectedProfit || 0).toFixed(4)} (${(trade.expectedProfitPercent || 0).toFixed(2)}%)</span>
                             </div>
-                            ${trade.actualProfit !== null ? `
+                            ${trade.actualProfit !== null && trade.actualProfit !== undefined ? `
                             <div class="info-group">
                                 <label>Actual Profit:</label>
-                                <span class="${trade.actualProfit >= 0 ? 'profit-positive' : 'profit-negative'}">
-                                    $${trade.actualProfit.toFixed(4)} (${trade.actualProfitPercent.toFixed(2)}%)
+                                <span class="${(trade.actualProfit || 0) >= 0 ? 'profit-positive' : 'profit-negative'}">
+                                    $${(trade.actualProfit || 0).toFixed(4)} (${(trade.actualProfitPercent || 0).toFixed(2)}%)
                                 </span>
                             </div>
                             ` : ''}
