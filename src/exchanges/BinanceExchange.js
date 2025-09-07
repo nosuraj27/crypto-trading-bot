@@ -503,9 +503,20 @@ class BinanceExchange extends BaseExchange {
             throw new Error(`Trading not enabled for ${this.name} - API keys required`);
         }
 
-        // Add timestamp if not present
+        // Use BinanceService for synced timestamp
+        const timestamp = this.binanceService.getSyncedTimestamp();
+
+        // Ensure timestamp is a valid integer
+        if (!Number.isInteger(timestamp) || timestamp <= 0) {
+            throw new Error(`Invalid timestamp: ${timestamp}`);
+        }
+
+        // Add timestamp and recvWindow if not present
         if (!params.timestamp) {
-            params.timestamp = Date.now();
+            params.timestamp = timestamp;
+        }
+        if (!params.recvWindow) {
+            params.recvWindow = 60000; // 60 seconds receive window
         }
 
         // Create query string for signature

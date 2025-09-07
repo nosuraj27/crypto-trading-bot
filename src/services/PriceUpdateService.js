@@ -137,31 +137,32 @@ class PriceUpdateService {
             this.exchangePrices[exchange] = {};
         }
 
-        // Update prices
+        // Update prices with a more sensitive threshold for triangular arbitrage
         let hasSignificantChanges = false;
         for (const [symbol, price] of Object.entries(priceUpdates)) {
             const oldPrice = this.exchangePrices[exchange][symbol];
-            if (!oldPrice || Math.abs((price - oldPrice) / oldPrice) >= 0.0001) { // 0.01% threshold
+            // Use a smaller threshold (0.001% instead of 0.01%) for more frequent updates
+            if (!oldPrice || Math.abs((price - oldPrice) / oldPrice) >= 0.00001) {
                 this.exchangePrices[exchange][symbol] = price;
                 hasSignificantChanges = true;
             }
         }
 
         if (hasSignificantChanges) {
-            // Recalculate both direct and triangular arbitrage opportunities
+            // Recalculate both direct and triangular arbitrage opportunities with fresh prices
             this.arbitrageOpportunities = ArbitrageCalculator.calculateDirectArbitrage(
                 this.exchangePrices,
                 TradingPairsService.getTradingPairs()
             );
 
-            // Recalculate triangular opportunities
+            // Recalculate triangular opportunities with new prices
             this.triangularOpportunities = [];
             for (const exchangeName in this.exchangePrices) {
                 const triangularOps = triangularService.analyzeTriangularOpportunities(this.exchangePrices, exchangeName);
                 this.triangularOpportunities.push(...triangularOps);
             }
 
-            // Combine all opportunities
+            // Combine all opportunities and ensure they're sorted by actual profit
             this.allOpportunities = [...this.arbitrageOpportunities, ...this.triangularOpportunities]
                 .sort((a, b) => parseFloat(b.profitPercent) - parseFloat(a.profitPercent));
 

@@ -500,16 +500,30 @@ class OpportunitiesModule {
       if (result.success) {
         console.log('✅ Trade executed successfully:', result.data);
 
-        // Calculate actual USDT profit
-        const actualProfitUSDT = result.data.actualProfit || tradeData.opportunity.expectedProfitUSDT;
-        const actualProfitPercent = result.data.actualProfitPercentage || tradeData.opportunity.profitPercentage;
+        // Handle different response formats for triangular vs direct arbitrage
+        let notificationMessage;
+        if (opportunity.arbitrageType === 'Triangular') {
+          const initialAmount = result.data.initialAmount || capitalAmount;
+          const finalAmount = result.data.finalAmount || (initialAmount + (result.data.actualProfit || 0));
+          const actualProfitUSDT = result.data.actualProfit || 0;
+          const actualProfitPercent = result.data.actualProfitPercentage || 0;
 
-        this.showNotification(
-          `✅ Trade executed successfully! 
-           Profit: $${actualProfitUSDT.toFixed(4)} USDT (${actualProfitPercent.toFixed(3)}%)
-           (${(result.data.tradingMode || 'testnet').toUpperCase()})`,
-          'success'
-        );
+          notificationMessage = `✅ Triangular Arbitrage Completed!
+           Initial: ${initialAmount.toFixed(2)} USDT
+           Final: ${finalAmount.toFixed(2)} USDT  
+           Profit: ${actualProfitUSDT.toFixed(4)} USDT (${actualProfitPercent.toFixed(3)}%)
+           Mode: ${(result.data.tradingMode || 'testnet').toUpperCase()}`;
+        } else {
+          // Direct arbitrage
+          const actualProfitUSDT = result.data.actualProfit || tradeData.opportunity.expectedProfitUSDT;
+          const actualProfitPercent = result.data.actualProfitPercentage || tradeData.opportunity.profitPercentage;
+
+          notificationMessage = `✅ Direct Arbitrage Completed! 
+           Profit: ${actualProfitUSDT.toFixed(4)} USDT (${actualProfitPercent.toFixed(3)}%)
+           Mode: ${(result.data.tradingMode || 'testnet').toUpperCase()}`;
+        }
+
+        this.showNotification(notificationMessage, 'success');
 
       } else {
         throw new Error(result.error || 'Trade execution failed');

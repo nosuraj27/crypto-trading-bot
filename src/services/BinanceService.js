@@ -10,6 +10,8 @@ class BinanceService {
         this.baseURL = testnet ? "https://testnet.binance.vision" : "https://api.binance.com";
         this.apiKey = process.env.BINANCE_API_KEY;
         this.apiSecret = process.env.BINANCE_API_SECRET;
+        this.serverTimeOffset = 0; // Offset to sync with Binance server time
+        this.lastServerTimeSync = 0; // Track when we last synced
 
         if (!this.apiKey || !this.apiSecret) {
             console.warn('Binance API credentials not found in environment variables');
@@ -22,6 +24,41 @@ class BinanceService {
         });
 
         console.log(`🔧 BinanceService initialized: ${testnet ? 'TESTNET' : 'MAINNET'} mode`);
+
+        // Initialize server time sync
+        this.syncServerTime();
+    }
+
+    // Sync with Binance server time to prevent timestamp errors
+    async syncServerTime() {
+        try {
+            const start = Date.now();
+            const response = await this.axiosInstance.get('/api/v3/time');
+            const end = Date.now();
+
+            const serverTime = response.data.serverTime;
+            const networkDelay = (end - start) / 2;
+            // Round the offset to avoid floating point precision issues
+            this.serverTimeOffset = Math.round(serverTime - end + networkDelay);
+            this.lastServerTimeSync = Date.now();
+
+            console.log(`🕐 Server time synced: offset ${this.serverTimeOffset}ms`);
+        } catch (error) {
+            console.warn(`⚠️ Server time sync failed: ${error.message}`);
+            this.serverTimeOffset = 0; // Fallback to no offset
+        }
+    }
+
+    // Get synchronized timestamp
+    getSyncedTimestamp() {
+        // Re-sync if last sync was more than 5 minutes ago
+        const fiveMinutes = 5 * 60 * 1000;
+        if (Date.now() - this.lastServerTimeSync > fiveMinutes) {
+            this.syncServerTime(); // Async sync in background
+        }
+
+        // Ensure timestamp is always an integer (Binance requires this)
+        return Math.floor(Date.now() + this.serverTimeOffset);
     }
 
     // Generate HMAC SHA256 signature
@@ -59,8 +96,18 @@ class BinanceService {
             throw new Error('API credentials are required for signed requests');
         }
 
-        const timestamp = Date.now();
-        const query = { ...params, timestamp };
+        const timestamp = this.getSyncedTimestamp();
+
+        // Ensure timestamp is a valid integer
+        if (!Number.isInteger(timestamp) || timestamp <= 0) {
+            throw new Error(`Invalid timestamp: ${timestamp}`);
+        }
+
+        const query = {
+            ...params,
+            timestamp,
+            recvWindow: 60000 // 60 seconds receive window
+        };
         const signature = this.generateSignature(query);
         query.signature = signature;
 

@@ -25,7 +25,7 @@ let config = {
     minProfitThreshold: 0.001,
     tradingMode: 'testnet', // 'testnet' or 'live'
     enableTriangularArbitrage: true,
-    maxTriangularTradeAmount: 500
+    maxTriangularTradeAmount: 10000 // Increased to allow larger trades based on API capital
 };
 
 const TRADE_STATUS = {
@@ -302,18 +302,56 @@ async function executeDirectArbitrage(opportunity, options = {}, tradeId, startT
 // Triangular arbitrage execution
 async function executeTriangularArbitrage(opportunity, options = {}, tradeId, startTime) {
     try {
-        logger.log(`🔺 Triangular Arbitrage Execution: ${opportunity.tradingPath}`);
-
         // Validate triangular opportunity
         if (!opportunity.steps || opportunity.steps.length !== 3) {
             throw new Error('Invalid triangular arbitrage opportunity - missing steps');
         }
 
-        // Use smaller amount for triangular arbitrage due to complexity
-        const tradeAmount = Math.min(
-            opportunity.capitalAmount || config.maxTriangularTradeAmount,
-            config.maxTriangularTradeAmount
-        );
+        // Safety check: Don't execute if expected profit is negative or too small
+        const expectedProfitPercent = parseFloat(opportunity.profitPercent);
+        if (expectedProfitPercent <= 0.1) { // At least 0.1% profit required
+            throw new Error(`Expected profit too low: ${expectedProfitPercent.toFixed(3)}% - minimum 0.1% required for execution`);
+        }
+
+        if (expectedProfitPercent < 0) {
+            throw new Error(`Negative expected profit: ${expectedProfitPercent.toFixed(3)}% - trade rejected for safety`);
+        }
+
+        // Get exchange instance for balance checking
+        const exchangeName = opportunity.exchange || opportunity.buyExchange;
+        const exchange = exchangeManager.getEnabledExchanges().get(exchangeName);
+
+        if (!exchange) {
+            throw new Error(`Exchange ${exchangeName} not found or not enabled`);
+        }
+
+        // Check actual USDT balance
+        logger.log(`🔍 Checking USDT balance on ${exchangeName}...`);
+        const balance = await exchange.getBalance();
+        const availableUSDT = parseFloat(balance['USDT'] || balance['usdt'] || '0');
+
+        logger.log(`💰 Available USDT balance: ${availableUSDT.toFixed(2)} USDT`);
+
+        // Use the exact capital amount from the API/opportunity
+        let tradeAmount = opportunity.capitalAmount || config.maxTriangularTradeAmount;
+
+        logger.log(`💰 Using capital amount from opportunity: ${tradeAmount.toFixed(2)} USDT`);
+
+        // Use a percentage of available balance for safety (max 90% of available funds)
+        const maxUsableBalance = availableUSDT * 0.9;
+
+        if (tradeAmount > maxUsableBalance) {
+            tradeAmount = Math.max(maxUsableBalance, 10); // Minimum $10 for testnet
+            logger.log(`⚠️ Adjusted trade amount to ${tradeAmount.toFixed(2)} USDT based on available balance`);
+        }
+
+        // Ensure minimum trade amount for exchange requirements
+        const minTradeAmount = exchangeName === 'binance' ? 10 : 5;
+        if (tradeAmount < minTradeAmount) {
+            throw new Error(`Insufficient USDT balance. Available: ${availableUSDT.toFixed(2)}, Required: ${minTradeAmount}`);
+        }
+
+        logger.log(`🎯 Using ${tradeAmount.toFixed(2)} USDT for triangular arbitrage`);
 
         // Save to database
         await TradeHistoryService.saveTradeRecord({
@@ -340,35 +378,45 @@ async function executeTriangularArbitrage(opportunity, options = {}, tradeId, st
         });
 
         if (result.success) {
-            // Update stats
+            // Calculate actual USDT profit (final amount - initial amount)
+            const actualUSDTProfit = result.finalAmount - tradeAmount;
+            const actualProfitPercent = (actualUSDTProfit / tradeAmount) * 100;
+
+            // Update stats with actual USDT values
             stats.totalTrades++;
             stats.successfulTrades++;
             stats.triangularTrades++;
-            stats.totalProfit += result.profit;
-            stats.triangularProfit += result.profit;
+            stats.totalProfit += actualUSDTProfit;
+            stats.triangularProfit += actualUSDTProfit;
 
-            // Update database
+            // Update database with actual USDT values
             await TradeHistoryService.updateTradeRecord(tradeId, {
                 status: TRADE_STATUS.COMPLETED,
-                actualProfit: result.profit,
-                actualProfitPercent: result.profitPercent,
+                actualProfit: actualUSDTProfit,
+                actualProfitPercent: actualProfitPercent,
                 executionTime: Date.now() - startTime,
                 buyOrderResponse: JSON.stringify(result.steps),
                 sellOrderResponse: JSON.stringify(result)
             });
 
-            logger.log(`✅ Triangular arbitrage completed: ${result.profit.toFixed(4)} profit`);
+            logger.log(`✅ Triangular arbitrage completed:`);
+            logger.log(`   Initial USDT: ${tradeAmount.toFixed(6)}`);
+            logger.log(`   Final USDT: ${result.finalAmount.toFixed(6)}`);
+            logger.log(`   Profit: ${actualUSDTProfit.toFixed(6)} USDT (${actualProfitPercent.toFixed(3)}%)`);
 
             return {
                 tradeId,
                 status: TRADE_STATUS.COMPLETED,
-                actualProfit: result.profit,
-                actualProfitPercentage: result.profitPercent,
+                initialAmount: tradeAmount,
+                finalAmount: result.finalAmount,
+                actualProfit: actualUSDTProfit,
+                actualProfitPercentage: actualProfitPercent,
                 executionTime: Date.now() - startTime,
                 tradingMode: config.tradingMode,
                 arbitrageType: 'Triangular',
                 steps: result.steps,
-                tradingPath: opportunity.tradingPath
+                tradingPath: opportunity.tradingPath,
+                currency: 'USDT'
             };
         } else {
             throw new Error(result.error || 'Triangular arbitrage execution failed');
@@ -436,8 +484,8 @@ function setTriangularArbitrage(enabled) {
 
 // Set maximum triangular trade amount
 function setMaxTriangularTradeAmount(amount) {
-    if (amount < 10 || amount > 10000) {
-        throw new Error('Triangular trade amount must be between $10 and $10,000');
+    if (amount < 10 || amount > 100000) {
+        throw new Error('Triangular trade amount must be between $10 and $100,000');
     }
     config.maxTriangularTradeAmount = amount;
     logger.log(`🔺 Max triangular trade amount set to: $${amount}`);
