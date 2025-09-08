@@ -559,6 +559,24 @@ class BinanceExchange extends BaseExchange {
     }
 
     /**
+     * Get current price for a trading pair
+     * @param {string} symbol - Trading pair symbol (e.g., VETUSDT)
+     * @returns {Promise<Object>} - Price data
+     */
+    async getPrice(symbol) {
+        try {
+            const priceData = await this.binanceService.getTickerPrice(symbol);
+            return {
+                symbol: priceData.symbol,
+                price: parseFloat(priceData.price)
+            };
+        } catch (error) {
+            this._log('error', `Failed to get price for ${symbol}: ${error.message}`);
+            throw error;
+        }
+    }
+
+    /**
      * Format quantity to appropriate precision for Binance
      * Most crypto pairs support up to 8 decimal places
      * For LINKUSDT, step size is typically 0.1
