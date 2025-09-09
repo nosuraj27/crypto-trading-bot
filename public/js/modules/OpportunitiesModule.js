@@ -465,6 +465,7 @@ class OpportunitiesModule {
 
         tradeData = {
           opportunity: {
+            pair: opportunity.pair,
             symbol: symbol,
             buyExchange: opportunity.buyExchange,
             sellExchange: opportunity.sellExchange,

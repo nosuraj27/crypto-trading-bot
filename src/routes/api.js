@@ -142,6 +142,7 @@ router.post('/execute-trade', async (req, res) => {
         }
 
         console.log('🚀 Trade execution requested via API:', {
+            pair: opportunity.pair,
             symbol: opportunity.symbol,
             buyExchange: opportunity.buyExchange,
             sellExchange: opportunity.sellExchange,
