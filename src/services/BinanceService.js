@@ -108,6 +108,11 @@ class BinanceService {
             timestamp,
             recvWindow: 60000 // 60 seconds receive window
         };
+
+        // Log the request for debugging signature issues
+        console.log(`   🔐 Binance API Request: ${method} ${endpoint}`);
+        console.log(`   📊 Parameters:`, Object.keys(query).map(k => `${k}=${query[k]}`).join('&'));
+
         const signature = this.generateSignature(query);
         query.signature = signature;
 
@@ -154,7 +159,8 @@ class BinanceService {
             symbol: data.symbol,
             side: data.side,
             type: data.type,
-            quantity: data.quantity,
+            ...(data.quantity && { quantity: data.quantity }),
+            ...(data.quoteOrderQty && { quoteOrderQty: data.quoteOrderQty }),
             ...(data.price && { price: data.price }),
             ...(data.timeInForce && { timeInForce: data.timeInForce }),
             ...(data.newClientOrderId && { newClientOrderId: data.newClientOrderId })
