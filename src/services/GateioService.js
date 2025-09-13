@@ -114,8 +114,17 @@ class GateioService {
     // === PUBLIC API METHODS ===
 
     async getTickerPrice(symbol) {
-        const endpoint = symbol ? `/api/v4/spot/tickers/${symbol}` : "/api/v4/spot/tickers";
-        return this.publicRequest(endpoint);
+        if (symbol) {
+            // For individual symbols, get all tickers and filter
+            const allTickers = await this.publicRequest("/api/v4/spot/tickers");
+            const ticker = allTickers.find(t => t.currency_pair === symbol);
+            if (!ticker) {
+                throw new Error('Resource not found');
+            }
+            return ticker;
+        } else {
+            return this.publicRequest("/api/v4/spot/tickers");
+        }
     }
 
     async getOrderBook(symbol, limit = 100) {

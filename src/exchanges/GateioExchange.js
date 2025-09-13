@@ -57,7 +57,88 @@ class GateioExchange extends BaseExchange {
             'UNI/USDT': 'UNI_USDT',
             'LTC/USDT': 'LTC_USDT',
             'BCH/USDT': 'BCH_USDT',
-            'ATOM/USDT': 'ATOM_USDT'
+            'ATOM/USDT': 'ATOM_USDT',
+            'AAVE/USDT': 'AAVE_USDT',
+            'ALGO/USDT': 'ALGO_USDT',
+            'TRX/USDT': 'TRX_USDT',
+
+            // Handle format without slash/underscore (like ALGOUSDT)
+            'BTCUSDT': 'BTC_USDT',
+            'ETHUSDT': 'ETH_USDT',
+            'BNBUSDT': 'BNB_USDT',
+            'SOLUSDT': 'SOL_USDT',
+            'XRPUSDT': 'XRP_USDT',
+            'ADAUSDT': 'ADA_USDT',
+            'DOGEUSDT': 'DOGE_USDT',
+            'MATICUSDT': 'MATIC_USDT',
+            'DOTUSDT': 'DOT_USDT',
+            'AVAXUSDT': 'AVAX_USDT',
+            'LINKUSDT': 'LINK_USDT',
+            'UNIUSDT': 'UNI_USDT',
+            'LTCUSDT': 'LTC_USDT',
+            'BCHUSDT': 'BCH_USDT',
+            'ATOMUSDT': 'ATOM_USDT',
+            'AAVEUSDT': 'AAVE_USDT',
+            'ALGOUSDT': 'ALGO_USDT',
+            'TRXUSDT': 'TRX_USDT',
+
+            // Additional popular coins
+            'APTUSDT': 'APT_USDT',
+            'ARBUSDT': 'ARB_USDT',
+            'ATOMUSDT': 'ATOM_USDT',
+            'BCHUSDT': 'BCH_USDT',
+            'CAKEUSDT': 'CAKE_USDT',
+            'CHZUSDT': 'CHZ_USDT',
+            'COMPUSDT': 'COMP_USDT',
+            'CRVUSDT': 'CRV_USDT',
+            'DASHUSDT': 'DASH_USDT',
+            'EGLDUSDT': 'EGLD_USDT',
+            'ENSUSDT': 'ENS_USDT',
+            'EOSUSDT': 'EOS_USDT',
+            'ETCUSDT': 'ETC_USDT',
+            'FETUSDT': 'FET_USDT',
+            'FILUSDT': 'FIL_USDT',
+            'FLOWUSDT': 'FLOW_USDT',
+            'FTMUSDT': 'FTM_USDT',
+            'GALAUSDT': 'GALA_USDT',
+            'GMTUSDT': 'GMT_USDT',
+            'GRTUSDT': 'GRT_USDT',
+            'HBARUSDT': 'HBAR_USDT',
+            'ICPUSDT': 'ICP_USDT',
+            'IMXUSDT': 'IMX_USDT',
+            'IOTAUSDT': 'IOTA_USDT',
+            'JASMYUSDT': 'JASMY_USDT',
+            'KAVAUSDT': 'KAVA_USDT',
+            'KLAYUSDT': 'KLAY_USDT',
+            'KSMUSDT': 'KSM_USDT',
+            'LDOUSDT': 'LDO_USDT',
+            'LRCUSDT': 'LRC_USDT',
+            'LUNAUSDT': 'LUNA_USDT',
+            'MANAUSDT': 'MANA_USDT',
+            'MASKUSDT': 'MASK_USDT',
+            'MINAUSDT': 'MINA_USDT',
+            'MKRUSDT': 'MKR_USDT',
+            'NEARUSDT': 'NEAR_USDT',
+            'NEOUSDT': 'NEO_USDT',
+            'ONEUSDT': 'ONE_USDT',
+            'OPUSDT': 'OP_USDT',
+            'QNTUSDT': 'QNT_USDT',
+            'ROSECUTT': 'ROSE_USDT',
+            'RUNEUSDT': 'RUNE_USDT',
+            'SANDUSDT': 'SAND_USDT',
+            'SHIBUSDT': 'SHIB_USDT',
+            'SNXUSDT': 'SNX_USDT',
+            'STXUSDT': 'STX_USDT',
+            'SUSHIUSDT': 'SUSHI_USDT',
+            'THETAUSDT': 'THETA_USDT',
+            'VETUSDT': 'VET_USDT',
+            'WAVESUSDT': 'WAVES_USDT',
+            'XLMUSDT': 'XLM_USDT',
+            'XMRUSDT': 'XMR_USDT',
+            'XTZUSDT': 'XTZ_USDT',
+            'YFIUSDT': 'YFI_USDT',
+            'ZECUSDT': 'ZEC_USDT',
+            'ZILUSDT': 'ZIL_USDT'
         };
 
         for (const [standard, gateio] of Object.entries(commonMappings)) {
@@ -180,6 +261,86 @@ class GateioExchange extends BaseExchange {
         } catch (error) {
             this._log('error', `Failed to fetch prices: ${error.message}`);
             return {};
+        }
+    }
+
+    /**
+     * Get current price for a symbol
+     * @param {string} symbol - Trading pair symbol (e.g., 'BTC_USDT')
+     * @returns {Promise<number>} - Current price
+     */
+    async getPrice(symbol) {
+        try {
+            const gateioSymbol = this.formatSymbol(symbol);
+            const ticker = await this.gateioService.getTickerPrice(gateioSymbol);
+
+            if (ticker && ticker.last) {
+                return parseFloat(ticker.last);
+            }
+
+            throw new Error(`No price data for ${gateioSymbol}`);
+        } catch (error) {
+            this._log('error', `Failed to get price for ${symbol}: ${error.message}`);
+            throw error;
+        }
+    }
+
+    /**
+     * Get ticker data for a symbol
+     * @param {string} symbol - Trading pair symbol
+     * @returns {Promise<Object>} - Ticker data
+     */
+    async getTicker(symbol) {
+        try {
+            const gateioSymbol = this.formatSymbol(symbol);
+            return await this.gateioService.getTickerPrice(gateioSymbol);
+        } catch (error) {
+            this._log('error', `Failed to get ticker for ${symbol}: ${error.message}`);
+            throw error;
+        }
+    }
+
+    /**
+     * Get all available trading pairs
+     * @returns {Promise<Array>} - Array of trading pair objects
+     */
+    async getAvailablePairs() {
+        try {
+            const response = await axios.get(`${this.baseUrl}/spot/currency_pairs`, {
+                timeout: 10000
+            });
+
+            if (response.data && Array.isArray(response.data)) {
+                return response.data.map(pair => ({
+                    symbol: pair.id,
+                    baseAsset: pair.base,
+                    quoteAsset: pair.quote,
+                    status: pair.trade_status,
+                    minAmount: pair.min_base_amount,
+                    minNotional: pair.min_quote_amount
+                }));
+            }
+
+            return [];
+        } catch (error) {
+            this._log('error', `Failed to get available pairs: ${error.message}`);
+            return [];
+        }
+    }
+
+    /**
+     * Check if a trading pair is available
+     * @param {string} symbol - Trading pair symbol
+     * @returns {Promise<boolean>} - True if available
+     */
+    async isPairAvailable(symbol) {
+        try {
+            const gateioSymbol = this.formatSymbol(symbol);
+            const availablePairs = await this.getAvailablePairs();
+            return availablePairs.some(pair => pair.symbol === gateioSymbol);
+        } catch (error) {
+            this._log('warn', `Could not check pair availability for ${symbol}: ${error.message}`);
+            return false;
         }
     }
 
@@ -324,52 +485,104 @@ class GateioExchange extends BaseExchange {
     }
 
     /**
-     * Create a new order on Gate.io
+     * Check if a trading pair is actively trading (has non-zero price)
+     * @param {string} symbol - Trading pair symbol
+     * @returns {Promise<boolean>} - True if actively trading
+     */
+    async isActivelyTrading(symbol) {
+        try {
+            const price = await this.getPrice(symbol);
+            return price && price > 0;
+        } catch (error) {
+            return false;
+        }
+    }
+
+    /**
+     * Get list of actively trading USDT pairs
+     * @returns {Promise<Array>} - Array of active trading pairs
+     */
+    async getActiveTradingPairs() {
+        try {
+            // Known active pairs on Gate.io testnet based on testing
+            const knownActivePairs = [
+                'TRX_USDT',
+                'SOL_USDT',
+                'BTC_USDT',
+                'XRP_USDT',
+                'BRISE_USDT'
+            ];
+
+            const activePairs = [];
+
+            for (const pair of knownActivePairs) {
+                try {
+                    const price = await this.getPrice(pair);
+                    if (price && price > 0) {
+                        activePairs.push({
+                            symbol: pair,
+                            price: price,
+                            baseAsset: pair.split('_')[0],
+                            quoteAsset: pair.split('_')[1]
+                        });
+                    }
+                } catch (error) {
+                    // Skip inactive pairs
+                }
+            }
+
+            return activePairs;
+        } catch (error) {
+            this._log('error', `Failed to get active trading pairs: ${error.message}`);
+            return [];
+        }
+    }
+
+    /**
+     * Enhanced create order with better error handling for inactive pairs
      */
     async createOrder(orderParams) {
         const { symbol, side, type, amount, quantity, price } = orderParams;
 
-        // Use amount if provided, otherwise use quantity
-        const orderQuantity = amount || quantity;
+        // First check if the pair is actively trading
+        const gateioSymbol = this.formatSymbol(symbol);
 
-        // Format quantity to appropriate precision
-        const formattedQuantity = this._formatQuantity(orderQuantity);
+        try {
+            const isActive = await this.isActivelyTrading(gateioSymbol);
+            if (!isActive) {
+                const activePairs = await this.getActiveTradingPairs();
+                const activeSymbols = activePairs.map(p => p.symbol).join(', ');
 
-        // Gate.io uses underscore format like BTC_USDT
-        // Convert LINKUSDT -> LINK_USDT or BTC/USDT -> BTC_USDT
-        let gateSymbol;
-        if (symbol.includes('/')) {
-            gateSymbol = symbol.replace('/', '_');
-        } else if (symbol.includes('USDT')) {
-            // Handle cases like LINKUSDT -> LINK_USDT
-            gateSymbol = symbol.replace('USDT', '_USDT');
-        } else if (symbol.includes('USDC')) {
-            // Handle cases like LINKUSDC -> LINK_USDC
-            gateSymbol = symbol.replace('USDC', '_USDC');
-        } else if (symbol.includes('BTC')) {
-            // Handle cases like LINKBTC -> LINK_BTC
-            gateSymbol = symbol.replace('BTC', '_BTC');
-        } else if (symbol.includes('ETH')) {
-            // Handle cases like LINKETH -> LINK_ETH
-            gateSymbol = symbol.replace('ETH', '_ETH');
-        } else {
-            // Fallback: assume it's already in correct format
-            gateSymbol = symbol;
+                throw new Error(
+                    `Trading pair ${gateioSymbol} is not actively trading on Gate.io testnet. ` +
+                    `Active pairs: ${activeSymbols}. ` +
+                    `Consider using mainnet for full market coverage.`
+                );
+            }
+        } catch (error) {
+            if (error.message.includes('not actively trading')) {
+                throw error;
+            }
+            // Continue with order creation if price check fails for other reasons
         }
 
+        const orderQuantity = amount || quantity;
+        const formattedQuantity = this._formatQuantity(orderQuantity)
+
         const params = {
-            currency_pair: gateSymbol,
+            currency_pair: gateioSymbol,
             side: side.toLowerCase(),
             type: type.toLowerCase(),
             amount: formattedQuantity
         };
 
+        // Only add price for limit orders
         if (type.toLowerCase() === 'limit' && price) {
             params.price = price.toString();
             params.time_in_force = 'gtc'; // Only for limit orders
         }
 
-        // For market orders, ensure price and time_in_force are NEVER sent, even if provided
+        // For market orders, ensure price and time_in_force are NEVER sent
         if (type.toLowerCase() === 'market') {
             if ('price' in params) {
                 delete params.price;
@@ -380,7 +593,7 @@ class GateioExchange extends BaseExchange {
         }
 
         try {
-            this._log('info', `Creating ${side} order for ${formattedQuantity} ${gateSymbol} at ${price || 'market'}`);
+            this._log('info', `Creating ${side} order for ${formattedQuantity} ${gateioSymbol} at ${price || 'market'}`);
 
             // Use GateioService placeOrder method
             const response = await this.gateioService.placeOrder(params);
@@ -391,7 +604,7 @@ class GateioExchange extends BaseExchange {
                 success: true,
                 orderId: response.id,
                 clientOrderId: response.text,
-                symbol: symbol,
+                symbol: gateioSymbol,
                 side: side,
                 type: type,
                 quantity: orderQuantity,
