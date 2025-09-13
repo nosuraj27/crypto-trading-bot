@@ -3339,6 +3339,15 @@ body {
     width: 100%;
     border-collapse: collapse;
     font-family: 'Inter', system-ui, sans-serif;
+    /* Keep header and body perfectly aligned */
+    table-layout: fixed;
+}
+
+/* Include padding in width calculations for perfect alignment */
+.history-table,
+.history-table th,
+.history-table td {
+    box-sizing: border-box;
 }
 
 .history-table th {
@@ -3357,6 +3366,21 @@ body {
     z-index: 10;
     text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
     background-attachment: fixed;
+    /* Prevent header text wrapping that can desync widths */
+    white-space: nowrap;
+}
+
+/* Match header alignment to cell alignment for these columns */
+.history-table th:nth-child(4),
+.history-table th:nth-child(5),
+.history-table th:nth-child(8),
+.history-table th:nth-child(9) {
+    text-align: center;
+}
+
+.history-table th:nth-child(6),
+.history-table th:nth-child(7) {
+    text-align: right;
 }
 
 .history-table th:first-child {
@@ -3373,6 +3397,71 @@ body {
     font-size: 0.9em;
     font-family: 'Inter', system-ui, sans-serif;
     vertical-align: middle;
+    /* Keep cell content from changing column widths */
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Explicit column widths to ensure perfect alignment */
+.history-table th:nth-child(1),
+.history-table td:nth-child(1) {
+    /* Date */
+    width: 12%;
+}
+
+.history-table th:nth-child(2),
+.history-table td:nth-child(2) {
+    /* Trade ID */
+    width: 12%;
+}
+
+.history-table th:nth-child(3),
+.history-table td:nth-child(3) {
+    /* Symbol */
+    width: 10%;
+}
+
+.history-table th:nth-child(4),
+.history-table td:nth-child(4) {
+    /* Buy Exchange */
+    width: 14%;
+    text-align: center;
+}
+
+.history-table th:nth-child(5),
+.history-table td:nth-child(5) {
+    /* Sell Exchange */
+    width: 14%;
+    text-align: center;
+}
+
+.history-table th:nth-child(6),
+.history-table td:nth-child(6) {
+    /* Capital */
+    width: 8%;
+    text-align: right;
+}
+
+.history-table th:nth-child(7),
+.history-table td:nth-child(7) {
+    /* Profit */
+    width: 12%;
+    text-align: right;
+}
+
+.history-table th:nth-child(8),
+.history-table td:nth-child(8) {
+    /* Status */
+    width: 12%;
+    text-align: center;
+}
+
+.history-table th:nth-child(9),
+.history-table td:nth-child(9) {
+    /* Actions */
+    width: 6%;
+    text-align: center;
 }
 
 .trade-row {
@@ -3381,7 +3470,16 @@ body {
     position: relative;
 }
 
+/* Move the left accent bar into the first cell to avoid layout shifts */
 .trade-row::before {
+    display: none;
+}
+
+.trade-row td:first-child {
+    position: relative;
+}
+
+.trade-row td:first-child::before {
     content: '';
     position: absolute;
     left: 0;
@@ -3394,11 +3492,12 @@ body {
 
 .trade-row:hover {
     background: linear-gradient(90deg, rgba(255, 215, 0, 0.08) 0%, rgba(255, 215, 0, 0.04) 100%);
-    transform: translateX(5px);
+    /* Avoid shifting the row which misaligns with the header */
+    transform: none;
     box-shadow: 0 4px 20px rgba(255, 215, 0, 0.1);
 }
 
-.trade-row:hover::before {
+.trade-row:hover td:first-child::before {
     background: linear-gradient(180deg, #FFD700, #FFA500);
     box-shadow: 0 0 10px rgba(255, 215, 0, 0.3);
 }
