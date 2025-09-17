@@ -4,12 +4,21 @@ const dotenv = require("dotenv");
 
 dotenv.config();
 
+// Import configuration
+const { EXCHANGES_CONFIG } = require('../config/exchanges');
+
 class BybitService {
-    constructor(testnet = false) {
+    constructor(testnet = null) {
+        // Use environment configuration if testnet is not explicitly set
+        if (testnet === null) {
+            testnet = EXCHANGES_CONFIG.bybit.testnet;
+        }
+
         this.testnet = testnet;
-        this.baseURL = testnet ? "https://api-testnet.bybit.com" : "https://api.bybit.com";
-        this.apiKey = process.env.BYBIT_API_KEY;
-        this.apiSecret = process.env.BYBIT_API_SECRET;
+        this.config = EXCHANGES_CONFIG.bybit;
+        this.baseURL = this.config.baseURL;
+        this.apiKey = this.config.apiKey;
+        this.apiSecret = this.config.apiSecret;
 
         if (!this.apiKey || !this.apiSecret) {
             console.warn('Bybit API credentials not found in environment variables');
@@ -18,10 +27,11 @@ class BybitService {
         this.axiosInstance = axios.create({
             baseURL: this.baseURL,
             headers: { "X-BAPI-API-KEY": this.apiKey },
-            timeout: 10000
+            timeout: this.config.timeout
         });
 
         console.log(`🔧 BybitService initialized: ${testnet ? 'TESTNET' : 'MAINNET'} mode`);
+        console.log(`🔗 Using endpoint: ${this.baseURL}`);
     }
 
     // Generate HMAC SHA256 signature for Bybit V5 API

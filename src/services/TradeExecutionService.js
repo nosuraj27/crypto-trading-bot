@@ -5,6 +5,7 @@
 
 const TradeHistoryService = require('./TradeHistoryService');
 const TriangularArbitrageService = require('./TriangularArbitrageService');
+const APP_CONFIG = require('../config/app');
 
 // Initialize triangular arbitrage service
 const triangularService = new TriangularArbitrageService(null);
@@ -22,10 +23,13 @@ let stats = {
     triangularProfit: 0
 };
 let config = {
-    minProfitThreshold: 0.001,
-    tradingMode: 'testnet', // 'testnet' or 'live'
+    minProfitThreshold: APP_CONFIG.trading.minProfitThreshold / 100, // Convert from percentage
+    tradingMode: APP_CONFIG.mode.trading,
     enableTriangularArbitrage: true,
-    maxTriangularTradeAmount: 10000 // Increased to allow larger trades based on API capital
+    maxTriangularTradeAmount: APP_CONFIG.trading.maxTradeAmount,
+    defaultCapital: APP_CONFIG.trading.defaultCapital,
+    minTradeAmount: APP_CONFIG.trading.minTradeAmount,
+    maxTradeAmount: APP_CONFIG.trading.maxTradeAmount
 };
 
 const TRADE_STATUS = {
@@ -42,7 +46,8 @@ function setup(exchangeMgr, loggerInstance, settings = {}) {
     // Pass the exchange manager to the triangular arbitrage service
     triangularService.setExchangeManager(exchangeManager);
 
-    logger.log('Trade service setup complete');
+    logger.log(`🔧 Trade service setup complete - Mode: ${config.tradingMode}`);
+    logger.log(`💰 Trading limits: ${config.minTradeAmount} - ${config.maxTradeAmount} USDT`);
 }
 
 // Main function - execute a trade (supports both direct and triangular arbitrage)
@@ -91,7 +96,7 @@ async function executeDirectArbitrage(opportunity, options = {}, tradeId, startT
         logger.log(`   Expected profit: ${opportunity.profitPercentage.toFixed(2)}%`);
 
         // Calculate trade details
-        const tradeAmount = opportunity.amount || 100;
+        const tradeAmount = opportunity.amount || config.defaultCapital;
         const quantity = tradeAmount / opportunity.buyPrice;
 
         // Save to database
@@ -161,7 +166,7 @@ async function executeDirectArbitrage(opportunity, options = {}, tradeId, startT
                 // In testnet mode, adjust trade size to available balance
                 if (usdtBalance < requiredUSDT || usdtBalance === 0) {
                     if (usdtBalance >= 10) { // Minimum $10 trade
-                        actualTradeAmount = Math.min(usdtBalance * 0.9, 50); // Use 90% of balance, max $50
+                        actualTradeAmount = Math.min(usdtBalance * 0.9, config.maxTradeAmount); // Use 90% of balance, with configurable max
                         actualQuantity = actualTradeAmount / opportunity.buyPrice;
                         logger.log(`📊 Adjusted testnet trade: $${actualTradeAmount} (${actualQuantity.toFixed(8)} ${baseCurrency})`);
                     } else {
@@ -484,8 +489,8 @@ function setTriangularArbitrage(enabled) {
 
 // Set maximum triangular trade amount
 function setMaxTriangularTradeAmount(amount) {
-    if (amount < 10 || amount > 100000) {
-        throw new Error('Triangular trade amount must be between $10 and $100,000');
+    if (amount < config.minTradeAmount || amount > config.maxTradeAmount) {
+        throw new Error(`Triangular trade amount must be between $${config.minTradeAmount} and $${config.maxTradeAmount}`);
     }
     config.maxTriangularTradeAmount = amount;
     logger.log(`🔺 Max triangular trade amount set to: $${amount}`);

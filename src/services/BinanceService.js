@@ -4,12 +4,21 @@ const dotenv = require("dotenv");
 
 dotenv.config();
 
+// Import configuration
+const { EXCHANGES_CONFIG } = require('../config/exchanges');
+
 class BinanceService {
-    constructor(testnet = false) {
+    constructor(testnet = null) {
+        // Use environment configuration if testnet is not explicitly set
+        if (testnet === null) {
+            testnet = EXCHANGES_CONFIG.binance.testnet;
+        }
+
         this.testnet = testnet;
-        this.baseURL = testnet ? "https://testnet.binance.vision" : "https://api.binance.com";
-        this.apiKey = process.env.BINANCE_API_KEY;
-        this.apiSecret = process.env.BINANCE_API_SECRET;
+        this.config = EXCHANGES_CONFIG.binance;
+        this.baseURL = this.config.baseURL;
+        this.apiKey = this.config.apiKey;
+        this.apiSecret = this.config.apiSecret;
         this.serverTimeOffset = 0; // Offset to sync with Binance server time
         this.lastServerTimeSync = 0; // Track when we last synced
 
@@ -20,10 +29,11 @@ class BinanceService {
         this.axiosInstance = axios.create({
             baseURL: this.baseURL,
             headers: { "X-MBX-APIKEY": this.apiKey },
-            timeout: 10000
+            timeout: this.config.timeout
         });
 
         console.log(`🔧 BinanceService initialized: ${testnet ? 'TESTNET' : 'MAINNET'} mode`);
+        console.log(`🔗 Using endpoint: ${this.baseURL}`);
 
         // Initialize server time sync
         this.syncServerTime();

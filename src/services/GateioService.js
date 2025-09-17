@@ -2,16 +2,23 @@ const axios = require("axios");
 const crypto = require("crypto");
 const dotenv = require("dotenv");
 
-
 dotenv.config();
 
+// Import configuration
+const { EXCHANGES_CONFIG } = require('../config/exchanges');
+
 class GateioService {
-    constructor(testnet = false) {
+    constructor(testnet = null) {
+        // Use environment configuration if testnet is not explicitly set
+        if (testnet === null) {
+            testnet = EXCHANGES_CONFIG.gateio.testnet;
+        }
+
         this.testnet = testnet;
-        // Gate.io URLs - testnet uses different endpoint
-        this.baseURL = testnet ? "https://api-testnet.gateapi.io" : "https://api.gateio.ws";
-        this.apiKey = process.env.GATEIO_API_KEY;
-        this.apiSecret = process.env.GATEIO_API_SECRET;
+        this.config = EXCHANGES_CONFIG.gateio;
+        this.baseURL = this.config.baseURL;
+        this.apiKey = this.config.apiKey;
+        this.apiSecret = this.config.apiSecret;
 
         if (!this.apiKey || !this.apiSecret) {
             console.warn('Gate.io API credentials not found in environment variables');
@@ -19,7 +26,7 @@ class GateioService {
 
         this.axiosInstance = axios.create({
             baseURL: this.baseURL,
-            timeout: 10000
+            timeout: this.config.timeout
         });
 
         // Add request interceptor to log requests
@@ -28,6 +35,7 @@ class GateioService {
         });
 
         console.log(`🔧 GateioService initialized: ${testnet ? 'TESTNET' : 'MAINNET'} mode`);
+        console.log(`🔗 Using endpoint: ${this.baseURL}`);
     }
 
     // Generate Gate.io signature

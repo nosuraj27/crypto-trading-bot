@@ -23,10 +23,14 @@ class BinanceExchange extends BaseExchange {
         // Binance-specific URLs
         this.tradingApiUrl = this.testnet ? 'https://testnet.binance.vision/api/v3' : 'https://api.binance.com/api/v3';
         this.testnetApiUrl = 'https://testnet.binance.vision/api/v3';
-        this.testnetWsUrl = 'wss://testnet.binance.vision/ws-api/v3';
+        this.testnetWsUrl = 'wss://stream.testnet.binance.vision/ws/!ticker@arr';
+
+        // Set the correct WebSocket URL based on testnet mode
+        this.wsUrl = this.testnet ? this.testnetWsUrl : (config.wsUrl || 'wss://stream.binance.com:9443/ws/!ticker@arr');
 
         this._log('info', `Initialized with ${this.testnet ? 'TESTNET' : 'MAINNET'} configuration`);
         this._log('info', `API credentials: ${this.apiKey ? 'SET' : 'NOT SET'}`);
+        this._log('info', `WebSocket URL: ${this.wsUrl}`);
 
         // Test connectivity on initialization
         this.testConnection();

@@ -4,8 +4,11 @@
     "description": "Simple Direct Arbitrage Bot",
     "main": "app.js",
     "scripts": {
-        "start": "nodemon app.js",
-        "dev": "nodemon app.js"
+        "start": "node app.js",
+        "dev": "nodemon app.js",
+        "setup-testnet": "node scripts/setup-testnet.js",
+        "validate-testnet": "node scripts/validate-testnet.js",
+        "testnet": "npm run validate-testnet && npm start"
     },
     "dependencies": {
         "@prisma/client": "^6.14.0",

@@ -55,9 +55,10 @@ class ArbitrageCalculator {
             const price2 = exchangePrices[exchange2][pair];
 
             if (price1 && price2) {
-                // Create a small artificial spread (0.2-0.5%) for demo
+                // Create a small artificial spread using configurable values
                 const basePrice = Math.min(price1, price2);
-                const demoSpread = 0.002 + (Math.random() * 0.003); // 0.2% to 0.5%
+                const demoSpread = APP_CONFIG.trading.demoSpreadMin +
+                    (Math.random() * (APP_CONFIG.trading.demoSpreadMax - APP_CONFIG.trading.demoSpreadMin));
 
                 const buyPrice = basePrice;
                 const sellPrice = basePrice * (1 + demoSpread);
@@ -174,8 +175,8 @@ class ArbitrageCalculator {
                     const priceDifferencePercent = (priceDifference / bestBuyExchange.price) * 100;
 
                     // Only show profitable arbitrage opportunities with meaningful profit
-                    // Lowered threshold to show more opportunities
-                    if (profitPercent > 0.01) { // 0.01% instead of configured threshold
+                    // Using configurable threshold
+                    if (profitPercent > APP_CONFIG.trading.directArbitrageThreshold) {
                         opportunities.push({
                             pair: pair,
                             pairName: pairObj.name,
@@ -234,8 +235,8 @@ class ArbitrageCalculator {
             // Only proceed if we have a reasonable number of pairs
             if (availablePairs.length < 10) continue;
 
-            // Common base currencies for triangular arbitrage (focus on main ones)
-            const baseCurrencies = ['USDT', 'BTC', 'ETH'];
+            // Common base currencies for triangular arbitrage (configurable)
+            const baseCurrencies = APP_CONFIG.currencies.baseCurrencies;
 
             for (const baseCurrency of baseCurrencies) {
                 // Find triangular arbitrage opportunities involving this base currency
@@ -259,8 +260,10 @@ class ArbitrageCalculator {
                             direction, exchangeFee, defaultCapital
                         );
 
-                        // Only add opportunities with meaningful profit (0.1% to 0.8% realistic range)
-                        if (result && parseFloat(result.profitPercent) > 0.1 && parseFloat(result.profitPercent) < 1.0) {
+                        // Only add opportunities with meaningful profit using configurable thresholds
+                        if (result &&
+                            parseFloat(result.profitPercent) > APP_CONFIG.trading.triangularArbitrageThreshold &&
+                            parseFloat(result.profitPercent) < APP_CONFIG.trading.maxArbitrageProfit) {
                             opportunities.push({
                                 ...result,
                                 exchange: exchange,
@@ -455,13 +458,13 @@ class ArbitrageCalculator {
             const finalNetProfit = currentAmount - capital;
             const profitPercent = (finalNetProfit / capital) * 100;
 
-            // Only return profitable opportunities (more than 0.1% after fees)
-            if (profitPercent <= 0.1) {
+            // Only return profitable opportunities using configurable threshold
+            if (profitPercent <= APP_CONFIG.trading.triangularArbitrageThreshold) {
                 return null;
             }
 
-            // Cap unrealistic profits at 1.5%
-            const cappedProfit = Math.min(finalNetProfit, capital * 0.015);
+            // Cap unrealistic profits using configurable maximum
+            const cappedProfit = Math.min(finalNetProfit, capital * (APP_CONFIG.trading.maxArbitrageProfit / 100));
             const cappedProfitPercent = (cappedProfit / capital) * 100;
 
             // Calculate coin amounts for each step
